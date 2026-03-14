@@ -1,0 +1,1 @@
+async function e(e){try{let t=`rdp_registrations`,n=JSON.parse(localStorage.getItem(t)||`[]`),r={id:Date.now(),createdAt:new Date().toISOString(),...e};return n.push(r),localStorage.setItem(t,JSON.stringify(n)),{ok:!0,id:r.id}}catch(e){return{ok:!1,error:String(e)}}}export{e as registerUser};
