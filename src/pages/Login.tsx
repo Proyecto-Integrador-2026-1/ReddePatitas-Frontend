@@ -1,7 +1,7 @@
 import React from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
-import { Button, Card, Input, Label } from "./ui";
+import { Button, Card, Input, Label } from "../components/ui";
 
 type LoginData = { email: string; password: string };
 

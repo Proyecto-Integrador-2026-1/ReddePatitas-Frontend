@@ -1,5 +1,5 @@
 import React from "react";
-import { Button, Card, Input, Label } from "./ui";
+import { Button, Card, Input, Label } from "../components/ui";
 import { useForm } from "react-hook-form";
 
 type ReportData = { name: string; description: string };

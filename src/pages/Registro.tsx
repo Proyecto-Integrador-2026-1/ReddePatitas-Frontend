@@ -2,7 +2,7 @@ import React from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Badge, Button, Card, Checkbox, Input, Label } from "./ui";
+import { Badge, Button, Card, Checkbox, Input, Label } from "../components/ui";
 
 const assets = {
   hero: "/assets/registro-hero.png",
