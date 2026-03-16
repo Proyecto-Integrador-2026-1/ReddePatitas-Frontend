@@ -1,5 +1,3 @@
-<<<<<<< HEAD
-# RedDePatitas - Frontend
 # RedDePatitas - Frontend
 
 Proyecto frontend para la plataforma Red de Patitas. Implementado con React + TypeScript y Tailwind CSS, generado desde diseños en Figma y preparado para ejecutarse con Vite.
@@ -14,20 +12,20 @@ Proyecto frontend para la plataforma Red de Patitas. Implementado con React + Ty
 - react-router-dom (rutas)
 - react-hook-form + zod (formularios y validación)
 - clsx / utilidad `cn` (clases condicionales)
-- shadcn-style UI primitives (wrappers en `src/components/ui/shadcn`)
+- UI wrappers unificados en `src/components/ui` (basados en estilos shadcn)
 - ESLint + Prettier (lint y formateo)
 
 ## Estructura relevante
 
 - `src/` – código fuente React
-- `src/components/` – componentes principales (`Registro`, `MapaPrincipal`, `Login`, `Reportar`, `ui`)
-- `src/components/ui/shadcn` – primitives base
+- `src/components/` – componentes principales (`Registro`, `Principal`, `Login`, `Reportar`, `ui`)
+- `src/components/ui` – UI wrappers unificados (estilos shadcn integrados)
 - `public/assets/` – imágenes y assets descargados desde Figma
 - `src/lib/api.ts` – mock simple (localStorage) para registrar/listar
 
 ## Rutas disponibles (desarrollo)
 
-- `/` → `MapaPrincipal` (vista principal)
+- `/` → `Principal` (vista principal)
 - `/login` → `Login`
 - `/registro` → `Registro`
 - `/reportar` → `Reportar`

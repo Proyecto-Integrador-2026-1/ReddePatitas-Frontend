@@ -1,9 +1,9 @@
-export async function registerUser(data: unknown) {
+export async function registerUser(data: Record<string, unknown>) {
   // Simple local storage mock for registrations
   try {
     const key = "rdp_registrations";
     const existing = JSON.parse(localStorage.getItem(key) || "[]");
-    const record = { id: Date.now(), createdAt: new Date().toISOString(), ...data };
+    const record = { id: Date.now(), createdAt: new Date().toISOString(), ...(data as Record<string, unknown>) };
     existing.push(record);
     localStorage.setItem(key, JSON.stringify(existing));
     return { ok: true, id: record.id };
@@ -17,11 +17,11 @@ export async function listRegistrations() {
   return JSON.parse(localStorage.getItem(key) || "[]");
 }
 
-export async function registerReport(data: unknown) {
+export async function registerReport(data: Record<string, unknown>) {
   try {
     const key = "rdp_reports";
     const existing = JSON.parse(localStorage.getItem(key) || "[]");
-    const record = { id: Date.now(), createdAt: new Date().toISOString(), ...data };
+    const record = { id: Date.now(), createdAt: new Date().toISOString(), ...(data as Record<string, unknown>) };
     existing.push(record);
     localStorage.setItem(key, JSON.stringify(existing));
     return { ok: true, id: record.id };

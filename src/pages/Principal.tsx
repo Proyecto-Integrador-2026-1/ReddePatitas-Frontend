@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { Avatar, Badge, Button, Chip, PetCard, Pet, SideNav } from "./ui";
+import { Avatar, Chip, PetCard, Pet, SideNav, Button, Badge } from "../components/ui";
 
 const assets = {
   map: "/assets/mapa.png",
@@ -76,7 +76,7 @@ const markers = [
   { id: "marker-gato", label: "Sin Nombre", status: "Encontrado", x: "62%", y: "32%", image: assets.gato },
 ];
 
-export function MapaPrincipal() {
+export function Principal() {
   const navigate = useNavigate();
   return (
     <div className="min-h-screen bg-[#f5f1ea] text-[#020826]">
@@ -220,4 +220,4 @@ export function MapaPrincipal() {
   );
 }
 
-export default MapaPrincipal;
+export default Principal;
