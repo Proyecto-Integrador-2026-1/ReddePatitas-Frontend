@@ -12,7 +12,7 @@ const assets = {
 };
 
 const navItems = [
-  { label: "Mapa Principal", active: true, icon: <span className="h-5 w-5 rounded-full bg-[#8c7851]" /> },
+  { label: "Principal", active: true, icon: <span className="h-5 w-5 rounded-full bg-[#8c7851]" /> },
   { label: "Publicar Mascota", icon: <span className="h-5 w-5 rounded-full border border-[#8c7851]" /> },
   { label: "Mis Reportes", count: 3, icon: <span className="h-5 w-5 rounded-full bg-[#e5e7eb]" /> },
   { label: "Notificaciones", icon: <span className="h-5 w-5 rounded-full bg-[#e5e7eb]" /> },
@@ -90,7 +90,7 @@ export function Principal() {
           Aside (navegación): oculto en pantallas pequeñas para ahorrar espacio.
           Se muestra en `lg` (desktop) con ancho fijo.
         */}
-        <aside className="hidden lg:block w-64 rounded-3xl border border-[#e5e7eb] bg-white/90 p-6 shadow-[0px_25px_50px_rgba(0,0,0,0.1)]">
+        <aside className="hidden lg:flex lg:flex-col lg:min-h-screen w-64 rounded-3xl border border-[#e5e7eb] bg-white/90 p-6 shadow-[0px_25px_50px_rgba(0,0,0,0.1)]">
           <div className="mb-5 flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#020826] text-white">🐾</div>
             <p className="text-xl font-bold">Red de Patitas</p>
@@ -235,7 +235,6 @@ export function Principal() {
               </div>
             </div>
           </div>
-        </div>
         </div>
       </div>
     </div>
