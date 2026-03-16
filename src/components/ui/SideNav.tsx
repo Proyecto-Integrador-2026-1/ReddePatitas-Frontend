@@ -1,5 +1,6 @@
 import React from "react";
 import { Button } from "./Button";
+import { Link } from "react-router-dom";
 
 export type NavItem = {
   label: string;
@@ -34,9 +35,11 @@ export function SideNav({ items }: SideNavProps) {
         </div>
       ))}
       <div className="pt-3 border-t border-[#e5e7eb]">
-        <Button variant="solid" size="md" className="w-full">
-          Acceder
-        </Button>
+        <Link to="/login">
+          <Button variant="solid" size="md" className="w-full">
+            Acceder
+          </Button>
+        </Link>
       </div>
     </nav>
   );
