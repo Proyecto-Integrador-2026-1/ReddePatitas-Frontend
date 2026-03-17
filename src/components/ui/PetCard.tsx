@@ -19,8 +19,8 @@ export function PetCard({
 }: React.HTMLAttributes<HTMLDivElement> & { pet: Pet }) {
   const tone = pet.status === "PERDIDO" ? "warning" : "success";
   return (
-    <Card accent={pet.highlight ? "gold" : "neutral"} className={`relative flex gap-3 p-4 ${className}`} {...props}>
-      <div className="h-20 w-20 rounded-lg overflow-hidden">
+    <Card accent={pet.highlight ? "gold" : "neutral"} className={`relative flex gap-2 p-3 ${className}`} {...props}>
+      <div className="h-16 w-16 rounded-lg overflow-hidden">
         <img src={pet.image} alt={pet.name} className="h-full w-full object-cover" />
       </div>
       <div className="flex-1">

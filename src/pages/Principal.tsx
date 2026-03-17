@@ -1,6 +1,7 @@
 import React from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { Avatar, Chip, PetCard, Pet, SideNav, Button, Badge } from "../components/ui";
+import { Map, MapControls } from "@/components/ui/map";
+import { Avatar, Chip, PetCard, Pet, SideNav, Button, Badge, Card } from "../components/ui";
 
 const assets = {
   map: "/assets/mapa.png",
@@ -33,7 +34,7 @@ const navItems = [
   {
     label: "Mis Reportes",
     icon: (
-      <svg className="h-5 w-5 text-[#716040]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <svg className="h-5 w-5 text-[#716040] overflow-visible" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M3 7h18M7 12h10M10 17h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     ),
@@ -41,7 +42,7 @@ const navItems = [
   {
     label: "Notificaciones",
     icon: (
-      <svg className="h-5 w-5 text-[#716040]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <svg className="h-5 w-5 text-[#716040] overflow-visible" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M15 17H9a3 3 0 0 1-3-3V10a6 6 0 1 1 12 0v4a3 3 0 0 1-3 3z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         <path d="M13.73 21a2 2 0 0 1-3.46 0" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
@@ -123,6 +124,16 @@ const markers = [
   { id: "marker-gato", label: "Sin Nombre", status: "Encontrado", x: "62%", y: "32%", image: assets.gato },
 ];
 
+export function MyMap() {
+  return (
+      <Card className="h-[40vh] sm:h-[50vh] md:h-[60vh] lg:h-[75vh] xl:h-[80vh] p-0 overflow-hidden">
+      <Map center={[-74.006, 40.7128]} zoom={11}>
+        <MapControls />
+      </Map>
+    </Card>
+  );
+}
+
 export function Principal() {
   const navigate = useNavigate();
   return (
@@ -177,12 +188,12 @@ export function Principal() {
           {/* Área de contenido: lista a la izquierda y mapa a la derecha */}
           <div className="flex-1 flex gap-6 px-4 md:px-6 pb-6">
             {/* Lista de reportes (desktop) */}
-            <div className="hidden lg:block w-[420px]">
+            <div className="hidden lg:block w-auto max-w-[360px] flex flex-col">
               <div className="mb-4 flex items-center justify-between px-2">
                 <h3 className="text-lg font-bold">Mascotas en la zona</h3>
                 <span className="text-sm text-[#716040]">12 resultados</span>
               </div>
-              <div className="space-y-4">
+              <div className="space-y-4 overflow-y-auto max-h-[calc(100vh-220px)] pr-2">
                 {pets.map((pet) => (
                   <PetCard key={pet.name} pet={pet} />
                 ))}
@@ -194,10 +205,7 @@ export function Principal() {
 
             {/* Mapa (desktop & móvil) */}
             <div className="relative flex-1 overflow-hidden rounded-2xl">
-              <div className="absolute inset-0">
-                <img src={assets.map} alt="Mapa de Medellín" className="h-full w-full object-cover" />
-                <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#f9f4ef]/50 to-[#f9f4ef]" />
-              </div>
+              <MyMap />
 
               {/* Filtros (chips) en la esquina superior derecha del mapa */}
               <div className="absolute top-6 right-6 z-10 flex items-center gap-3">
@@ -205,13 +213,6 @@ export function Principal() {
                 <Chip icon={<span className="h-3 w-3 rounded-full bg-[#f25042]" />}>Gatos</Chip>
                 <Chip icon={<span className="h-3 w-3 rounded-full bg-[#020826]" />}>Recientes</Chip>
               </div>
-
-              {/* Zoom controls (ejemplo) */}
-              <div className="absolute right-6 top-36 z-10 flex flex-col gap-2">
-                <button className="bg-white rounded-md p-2 shadow">+</button>
-                <button className="bg-white rounded-md p-2 shadow">-</button>
-              </div>
-
               {/* Marcadores posicionados sobre el mapa */}
               {markers.map((marker) => (
                 <div
@@ -228,58 +229,6 @@ export function Principal() {
                   <p className="text-xs font-semibold text-[#020826]">{marker.label}</p>
                 </div>
               ))}
-
-              {/* Panel derecho (hero/details) en desktop: sobre el mapa */}
-              <div className="absolute right-10 top-32 z-10 w-[360px]">
-                <div className="rounded-[32px] border border-[#e5e7eb] bg-white p-5 shadow-[0px_20px_35px_rgba(0,0,0,0.15)]">
-                  <div className="relative h-[220px] overflow-hidden rounded-[28px]">
-                    <img src={assets.hero} alt="Rocky" className="h-full w-full object-cover" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-                    <div className="absolute inset-0 flex flex-col justify-end p-4 text-white">
-                      <p className="text-2xl font-bold">{hero.name}</p>
-                      <p className="text-sm">{hero.location}</p>
-                      <Badge tone="warning" className="mt-3 self-start">{hero.status}</Badge>
-                    </div>
-                  </div>
-
-                  <div className="mt-5 flex gap-3">
-                    {hero.stats.map((stat) => (
-                      <div key={stat.label} className="flex-1 rounded-2xl border border-[#e5e7eb] bg-[#f9f6ef] p-3 text-sm">
-                        <p className="text-xs text-[#716040]">{stat.label}</p>
-                        <p className="font-semibold text-[#020826]">{stat.value}</p>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="mt-6 space-y-2 text-sm text-[#716040]">
-                    {hero.summary.map((line) => (
-                      <p key={line}>{line}</p>
-                    ))}
-                  </div>
-
-                  <div className="mt-6 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Avatar src={hero.reporter.avatar} alt={hero.reporter.name} />
-                      <div>
-                        <p className="text-sm font-semibold text-[#020826]">Reportado por</p>
-                        <p className="text-base font-bold text-[#020826]">{hero.reporter.name}</p>
-                        <p className="text-xs text-[#716040]">({hero.rating} ⭐️)</p>
-                      </div>
-                    </div>
-                    <div className="flex flex-col items-end text-xs text-[#8c7851]">
-                      <span>Reputación</span>
-                      <span className="text-lg font-bold">4.8</span>
-                    </div>
-                  </div>
-
-                  <div className="mt-6 flex gap-3">
-                    <Button variant="solid" size="md" className="flex-1">Contactar</Button>
-                    <Button variant="outline" size="md" className="flex-1">Compartir</Button>
-                  </div>
-
-                  <Button variant="ghost" size="md" className="mt-4 w-full">Ver ruta</Button>
-                </div>
-              </div>
             </div>
           </div>
         </div>
