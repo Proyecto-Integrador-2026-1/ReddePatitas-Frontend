@@ -3,9 +3,10 @@ import { cn } from "../../lib/utils";
 
 export type InputProps = React.InputHTMLAttributes<HTMLInputElement> & {
   icon?: React.ReactNode;
+  rightIcon?: React.ReactNode;
 };
 
-export function Input({ icon, className = "", ...props }: InputProps) {
+export function Input({ icon, rightIcon, className = "", ...props }: InputProps) {
   return (
     <div className="relative">
       {icon && (
@@ -17,10 +18,16 @@ export function Input({ icon, className = "", ...props }: InputProps) {
         className={cn(
           "w-full rounded-[12px] border border-[#eaddcf] bg-[#f9f5f0]/60 px-4 py-3 text-sm text-[#020826] placeholder:text-[#b7a888] focus:border-[#8c7851] focus:outline-none focus:ring-2 focus:ring-[#f6f1e7]",
           icon ? "pl-12" : "",
+          rightIcon ? "pr-12" : "",
           className
         )}
         {...props}
       />
+      {rightIcon && (
+        <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[#716040] z-10">
+          {rightIcon}
+        </div>
+      )}
     </div>
   );
 }
