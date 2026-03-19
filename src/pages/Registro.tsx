@@ -53,11 +53,14 @@ type FormData = {
   accept: boolean;
 };
 
+const nameRegex = /^[A-Za-zÀ-ÖØ-öø-ÿ\s'-]+$/;
+const phoneRegex = /^\d{10}$/;
+
 const schema = z
   .object({
-    firstName: z.string().min(1, "El nombre es requerido"),
-    lastName: z.string().min(1, "El apellido es requerido"),
-    phone: z.string().min(1, "El teléfono es requerido").regex(/^[0-9]+$/, "El teléfono solo debe contener números").length(10, "El teléfono debe tener exactamente 10 dígitos"),
+    firstName: z.string().min(1, "El nombre es requerido").regex(nameRegex, "El nombre solo debe contener letras, espacios, apóstrofes o guiones"),
+    lastName: z.string().min(1, "El apellido es requerido").regex(nameRegex, "El apellido solo debe contener letras, espacios, apóstrofes o guiones"),
+    phone: z.string().min(1, "El teléfono es requerido").regex(phoneRegex, "El teléfono debe contener exactamente 10 dígitos"),
     password: z
       .string()
       .min(6, "Mínimo 6 caracteres")
@@ -105,7 +108,7 @@ export function Registro() {
   return (
     <div className="min-h-screen bg-[#f9f4ef] text-[#020826]">
       <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-6 px-4 py-6 sm:px-6 lg:flex-row lg:items-stretch lg:gap-10 lg:py-10">
-        <Card className="w-full max-w-[520px] lg:mx-auto border-[#e5e7eb] shadow-[0px_25px_50px_rgba(0,0,0,0.25)] p-6 sm:p-8 lg:p-10 lg:px-12">
+        <Card className="w-full max-w-[520px] lg:mx-auto border-[#e5e7eb] shadow-[0px_25px_50px_rgba(0,0,0,0.25)] p-6 sm:p-8 lg:p-10 lg:px-12 flex flex-col justify-between min-h-[420px] sm:min-h-[420px] lg:min-h-[520px]">
           <div className="space-y-3">
             <div className="flex items-center gap-3">
               <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#020826] text-xl font-semibold text-white">🐾</span>
@@ -170,7 +173,7 @@ export function Registro() {
               <div className="min-h-[20px]">
                 {errors.phone && <p className="text-xs text-[#f25042]">{String(errors.phone.message)}</p>}
               </div>
-              <p className="text-xs text-[#5c4e34]">Formato: +57 seguido de 10 dígitos</p>
+              <p className="text-xs text-[#5c4e34]">Formato: 10 dígitos (ej. 3004567890)</p>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
@@ -279,25 +282,26 @@ export function Registro() {
               <Button className="w-full text-base font-bold" type="submit" disabled={isSubmitting}>
                 {isSubmitting ? "Enviando..." : "Crear Cuenta"}
               </Button>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-2 text-xs text-[#5c4e34]">
-                  <p>Ayuda</p>
-                  <span>•</span>
-                  <p>Privacidad</p>
-                  <span>•</span>
-                  <p>Términos</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button type="button" onClick={() => window.location.assign("/")} className="text-sm text-[#716040]">
-                    Volver a Principal
-                  </button>
-                  <button type="button" onClick={() => window.location.assign("/login")} className="text-sm font-semibold text-[#020826]">
-                    ¿Ya tienes cuenta? Acceder
-                  </button>
-                </div>
-              </div>
             </div>
           </form>
+
+          <div className="mt-6 flex flex-col items-center gap-3">
+            <div className="flex items-center gap-4">
+              <button type="button" onClick={() => window.location.assign("/")} className="text-sm text-[#716040]">
+                Volver a Principal
+              </button>
+              <button type="button" onClick={() => window.location.assign("/login")} className="text-sm font-semibold text-[#020826]">
+                ¿Ya tienes cuenta? Acceder
+              </button>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-[#5c4e34] justify-center">
+              <p>Ayuda</p>
+              <span>•</span>
+              <p>Privacidad</p>
+              <span>•</span>
+              <p>Términos</p>
+            </div>
+          </div>
         </Card>
 
         <div className="hidden lg:block flex-1 space-y-10">
