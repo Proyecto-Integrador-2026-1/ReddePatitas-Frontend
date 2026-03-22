@@ -112,8 +112,8 @@
       "descripcion": "Perro mediano, pelaje marrón oscuro con manchas claras.",
       "fecha_desaparicion": "12-07-2025",
       "lugar_desaparicion": "Envigado, Antioquia",
-      "latitud": 6.18,
-      "longitud": -75.59,
+      "latitud": 6.180,
+      "longitud": -75.590,
       "fecha_publicacion": "13-07-2025",
       "url_imagen": "public/assets/mascotas/perro1.png"
     },
@@ -151,7 +151,7 @@
       "descripcion": "Perro mestizo de pelaje corto, responde con un silbido.",
       "fecha_desaparicion": "20-04-2025",
       "lugar_desaparicion": "Envigado, Antioquia",
-      "latitud": 6.17,
+      "latitud": 6.170,
       "longitud": -75.585,
       "fecha_publicacion": "23-04-2025",
       "url_imagen": "public/assets/mascotas/perro3.png"
@@ -178,7 +178,7 @@
       "fecha_desaparicion": "14-02-2025",
       "lugar_desaparicion": "Robledo, Medellín",
       "latitud": 6.305,
-      "longitud": -75.62,
+      "longitud": -75.620,
       "fecha_publicacion": "15-02-2025",
       "url_imagen": "public/assets/mascotas/gato2.png"
     },
@@ -190,8 +190,8 @@
       "descripcion": "Perro grande, buen carácter, tiene una mancha blanca en la pata.",
       "fecha_desaparicion": "05-01-2025",
       "lugar_desaparicion": "Belén, Medellín",
-      "latitud": 6.23,
-      "longitud": -75.6,
+      "latitud": 6.230,
+      "longitud": -75.600,
       "fecha_publicacion": "06-01-2025",
       "url_imagen": "public/assets/mascotas/perro1.png"
     },
@@ -216,8 +216,8 @@
       "descripcion": "Perra de tamaño mediano, orejas largas y mirada dulce.",
       "fecha_desaparicion": "11-11-2024",
       "lugar_desaparicion": "Guayabal, Medellín",
-      "latitud": 6.21,
-      "longitud": -75.59,
+      "latitud": 6.210,
+      "longitud": -75.590,
       "fecha_publicacion": "12-11-2024",
       "url_imagen": "public/assets/mascotas/perro2.png"
     },
