@@ -6,6 +6,8 @@ import { Button, Card, Input, Label, Badge } from "../components/ui";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
+const API_BASE = (import.meta.env.VITE_API_URL as string) || "http://localhost:400/api";
+
 const assets = {
   hero: "/assets/registro-hero.png",
   avatar1: "/assets/avatar1.png",
@@ -56,10 +58,56 @@ export function Login() {
   const navigate = useNavigate();
 
   async function onSubmit(data: LoginData) {
-    // simple mock: store last login
-    localStorage.setItem("rdp_last_login", JSON.stringify({ phone: data.phone, at: new Date().toISOString() }));
-    alert("Login simulado: " + data.phone);
-    navigate("/registro");
+    // Normalize inputs
+    const phone = String(data.phone ?? "").replace(/\D/g, "").trim();
+    const password = String(data.password ?? "").trim();
+
+    // Try authenticating against local json-server first
+    try {
+      // Fetch all users and search client-side to avoid json-server query edge-cases
+      const res = await fetch(`${API_BASE}/usuarios`);
+      if (res.ok) {
+        const users = await res.json();
+        console.debug("json-server returned users count", Array.isArray(users) ? users.length : 0);
+        const list = Array.isArray(users) ? users : [users];
+        // Normalize stored phone/password and compare strictly
+        const user = list.find((u: any) => {
+          const storedPhone = String(u.phone ?? "").replace(/\D/g, "").trim();
+          const storedPass = String(u.password ?? "").trim();
+          return storedPhone === phone && storedPass === password;
+        });
+        if (user) {
+          localStorage.setItem("rdp_last_login", JSON.stringify({ phone, at: new Date().toISOString() }));
+          alert("Login exitoso: " + phone);
+          navigate("/");
+          return;
+        }
+        // If users found but none matched, log list for debugging
+        if (list.length > 0 && !user) {
+          console.debug("No matching user/password found. Sample stored entries:", list.map((u: any) => ({ phone: u.phone, password: u.password })));
+        }
+      }
+    } catch (e) {
+      console.debug("json-server auth error", e);
+    }
+
+    // Fallback: check localStorage keys used by other helpers
+    try {
+      const registrations = JSON.parse(localStorage.getItem("rdp_registrations") || "[]");
+      const stored = JSON.parse(localStorage.getItem("rdp_usuarios") || "[]");
+      const all = Array.isArray(registrations) ? registrations.concat(stored || []) : stored || [];
+      const found = all.find((u: any) => String(u.phone) === String(data.phone) && String(u.password) === String(data.password));
+      if (found) {
+        localStorage.setItem("rdp_last_login", JSON.stringify({ phone: data.phone, at: new Date().toISOString() }));
+        alert("Login exitoso (local): " + data.phone);
+        navigate("/");
+        return;
+      }
+    } catch (err) {
+      console.debug("localStorage fallback error", err);
+    }
+
+    alert("Credenciales inválidas (intenta registrar primero)");
   }
 
   return (
