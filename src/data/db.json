@@ -112,8 +112,8 @@
       "descripcion": "Perro mediano, pelaje marrón oscuro con manchas claras.",
       "fecha_desaparicion": "12-07-2025",
       "lugar_desaparicion": "Envigado, Antioquia",
-      "latitud": 6.180,
-      "longitud": -75.590,
+      "latitud": 6.18,
+      "longitud": -75.59,
       "fecha_publicacion": "13-07-2025",
       "url_imagen": "public/assets/mascotas/perro1.png"
     },
@@ -151,7 +151,7 @@
       "descripcion": "Perro mestizo de pelaje corto, responde con un silbido.",
       "fecha_desaparicion": "20-04-2025",
       "lugar_desaparicion": "Envigado, Antioquia",
-      "latitud": 6.170,
+      "latitud": 6.17,
       "longitud": -75.585,
       "fecha_publicacion": "23-04-2025",
       "url_imagen": "public/assets/mascotas/perro3.png"
@@ -178,7 +178,7 @@
       "fecha_desaparicion": "14-02-2025",
       "lugar_desaparicion": "Robledo, Medellín",
       "latitud": 6.305,
-      "longitud": -75.620,
+      "longitud": -75.62,
       "fecha_publicacion": "15-02-2025",
       "url_imagen": "public/assets/mascotas/gato2.png"
     },
@@ -190,8 +190,8 @@
       "descripcion": "Perro grande, buen carácter, tiene una mancha blanca en la pata.",
       "fecha_desaparicion": "05-01-2025",
       "lugar_desaparicion": "Belén, Medellín",
-      "latitud": 6.230,
-      "longitud": -75.600,
+      "latitud": 6.23,
+      "longitud": -75.6,
       "fecha_publicacion": "06-01-2025",
       "url_imagen": "public/assets/mascotas/perro1.png"
     },
@@ -216,8 +216,8 @@
       "descripcion": "Perra de tamaño mediano, orejas largas y mirada dulce.",
       "fecha_desaparicion": "11-11-2024",
       "lugar_desaparicion": "Guayabal, Medellín",
-      "latitud": 6.210,
-      "longitud": -75.590,
+      "latitud": 6.21,
+      "longitud": -75.59,
       "fecha_publicacion": "12-11-2024",
       "url_imagen": "public/assets/mascotas/perro2.png"
     },
@@ -248,17 +248,109 @@
       "url_imagen": "public/assets/mascotas/gato4.png"
     },
     {
-        "id": "20",
-        "nombre": "Lili",
-        "tipo": "Perro",
-        "estado": "encontrada",
-        "descripcion": "Perra pequeña, con pelaje rizado y collar rosa.",
-        "fecha_desaparicion": "15-08-2024",
-        "lugar_desaparicion": "La América, Medellín",
-        "latitud": 6.2445,
-        "longitud": -75.622,
-        "fecha_publicacion": "16-08-2024",
-        "url_imagen": "public/assets/mascotas/perro4.png"
+      "id": "20",
+      "nombre": "Lili",
+      "tipo": "Perro",
+      "estado": "encontrada",
+      "descripcion": "Perra pequeña, con pelaje rizado y collar rosa.",
+      "fecha_desaparicion": "15-08-2024",
+      "lugar_desaparicion": "La América, Medellín",
+      "latitud": 6.2445,
+      "longitud": -75.622,
+      "fecha_publicacion": "16-08-2024",
+      "url_imagen": "public/assets/mascotas/perro4.png"
     }
-]
+  ],
+  "usuarios": [
+    {
+      "id": "cd9b",
+      "firstName": "Xiomara",
+      "lastName": "Betancur Isaza",
+      "phone": "3013438882",
+      "password": "X12345",
+      "confirm": "X12345",
+      "accept": true,
+      "creadoEn": "2026-03-22T15:51:21.313Z"
+    },
+    {
+      "id": "13b1",
+      "firstName": "Juan",
+      "lastName": "Perez",
+      "phone": "3124567897",
+      "password": "A12386",
+      "confirm": "A12386",
+      "accept": true,
+      "creadoEn": "2026-03-22T15:53:25.223Z"
+    },
+    {
+      "id": "53db",
+      "firstName": "Diana Marcela",
+      "lastName": "Duque",
+      "phone": "3147895245",
+      "password": "145682D",
+      "confirm": "145682D",
+      "accept": true,
+      "creadoEn": "2026-03-22T15:56:46.003Z"
+    },
+    {
+      "id": "316f",
+      "firstName": "Miguel",
+      "lastName": "Yepes",
+      "phone": "3128965741",
+      "password": "S45689",
+      "confirm": "S45689",
+      "accept": true,
+      "creadoEn": "2026-03-22T16:05:47.993Z"
+    },
+    {
+      "id": "f92a",
+      "firstName": "Daniel",
+      "lastName": "Lopez",
+      "phone": "3006400730",
+      "password": "D78965",
+      "confirm": "D78965",
+      "accept": true,
+      "creadoEn": "2026-03-22T16:11:00.241Z"
+    },
+    {
+      "id": "5ed9",
+      "firstName": "Cristian",
+      "lastName": "Duque",
+      "phone": "3127458233",
+      "password": "Cast45",
+      "confirm": "Cast45",
+      "accept": true,
+      "creadoEn": "2026-03-22T16:14:47.817Z"
+    },
+    {
+      "id": "e13f",
+      "firstName": "Andres",
+      "lastName": "Castaño",
+      "phone": "3154610080",
+      "password": "Cast47",
+      "confirm": "Cast47",
+      "accept": true,
+      "creadoEn": "2026-03-22T17:05:53.683Z"
+    },
+    {
+      "id": "8409",
+      "firstName": "Julian",
+      "lastName": "Zapata",
+      "phone": "3113274658",
+      "password": "Zap456",
+      "confirm": "Zap456",
+      "accept": true,
+      "creadoEn": "2026-03-22T17:48:13.159Z"
+    },
+    {
+      "id": "36a2",
+      "firstName": "Sebastian",
+      "lastName": "Marin",
+      "phone": "3458012596",
+      "password": "123456Q",
+      "confirm": "123456Q",
+      "accept": true,
+      "creadoEn": "2026-03-22T17:59:51.812Z"
+    }
+  ]
 }

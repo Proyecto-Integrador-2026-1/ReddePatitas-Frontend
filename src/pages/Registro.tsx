@@ -1,8 +1,11 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Badge, Button, Card, Checkbox, Input, Label } from "../components/ui";
+
+const API_BASE = (import.meta.env.VITE_API_URL as string) || "http://localhost:400/api";
 
 const assets = {
   hero: "/assets/registro-hero.png",
@@ -54,13 +57,17 @@ type FormData = {
 };
 
 const nameRegex = /^[A-Za-zÀ-ÖØ-öø-ÿ\s'-]+$/;
-const phoneRegex = /^\d{10}$/;
+const phoneDigitsRegex = /^\d+$/;
 
 const schema = z
   .object({
     firstName: z.string().min(1, "El nombre es requerido").regex(nameRegex, "El nombre solo debe contener letras, espacios, apóstrofes o guiones"),
     lastName: z.string().min(1, "El apellido es requerido").regex(nameRegex, "El apellido solo debe contener letras, espacios, apóstrofes o guiones"),
-    phone: z.string().min(1, "El teléfono es requerido").regex(phoneRegex, "El teléfono debe contener exactamente 10 dígitos"),
+    phone: z
+      .string()
+      .min(1, "El teléfono es requerido")
+      .regex(phoneDigitsRegex, "El teléfono solo debe contener números")
+      .length(10, "El teléfono debe contener exactamente 10 dígitos"),
     password: z
       .string()
       .min(6, "Mínimo 6 caracteres")
@@ -76,6 +83,7 @@ const schema = z
 
 export function Registro() {
   const [showPassword, setShowPassword] = useState(false);
+  const navigate = useNavigate();
 
   const {
     control,
@@ -95,9 +103,24 @@ export function Registro() {
 
   async function onSubmit(data: FormData) {
     try {
-      const { registerUser } = await import("../lib/api");
-      await registerUser(data);
-      alert("Registro guardado localmente");
+      // Try saving via local API (json-server). Falls back to localStorage via lib/api
+      try {
+        const res = await fetch(`${API_BASE}/usuarios`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...data, creadoEn: new Date().toISOString() }),
+        });
+        if (!res.ok) throw new Error("API error");
+        alert("Registro guardado en json-server");
+        navigate("/");
+        return;
+      } catch (apiErr) {
+        const { registerUser } = await import("../lib/api");
+        await registerUser(data);
+        alert("Registro guardado localmente (fallback)");
+        navigate("/");
+        return;
+      }
     } catch (err) {
       console.error(err);
       alert("Error al enviar");
