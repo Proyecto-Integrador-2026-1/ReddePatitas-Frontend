@@ -7,6 +7,8 @@ export type NavItem = {
   active?: boolean;
   count?: number;
   icon?: React.ReactNode;
+  /** Optional route to navigate when the item is clicked */
+  to?: string;
 };
 
 type SideNavProps = {
@@ -23,46 +25,58 @@ export function SideNav({ items }: SideNavProps) {
     // make nav full-height and distribute content so Acceder stays at the bottom
     <nav className="h-full flex flex-col justify-between">
       <div className="space-y-3">
-        {topItems.map((item) => (
-          <div
-            key={item.label}
-            className={`flex items-center justify-between rounded-xl px-3 py-2 transition ${
-              item.active ? "bg-[#f9f4ef] shadow-[0px_4px_6px_rgba(0,0,0,0.1)]" : "text-[#716040] hover:bg-[#f6f1e7]"
-            }`}
-          >
+        {topItems.map((item) => {
+          const content = (
             <div className="flex items-center gap-3 text-sm font-semibold text-[#020826]">
               {item.icon}
               <span>{item.label}</span>
             </div>
-            {typeof item.count === "number" && (
-              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#8c7851] text-xs font-bold text-white">
-                {item.count}
-              </span>
-            )}
-          </div>
-        ))}
-      </div>
+          );
 
-      <div>
-        <div className="pt-3 border-t border-[#e5e7eb] space-y-3">
-          {bottomItems.map((item) => (
+          return (
             <div
               key={item.label}
               className={`flex items-center justify-between rounded-xl px-3 py-2 transition ${
                 item.active ? "bg-[#f9f4ef] shadow-[0px_4px_6px_rgba(0,0,0,0.1)]" : "text-[#716040] hover:bg-[#f6f1e7]"
               }`}
             >
-              <div className="flex items-center gap-3 text-sm font-semibold text-[#020826]">
-                {item.icon}
-                <span>{item.label}</span>
-              </div>
+              {item.to ? <Link to={item.to}>{content}</Link> : content}
               {typeof item.count === "number" && (
                 <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#8c7851] text-xs font-bold text-white">
                   {item.count}
                 </span>
               )}
             </div>
-          ))}
+          );
+        })}
+      </div>
+
+      <div>
+        <div className="pt-3 border-t border-[#e5e7eb] space-y-3">
+          {bottomItems.map((item) => {
+            const content = (
+              <div className="flex items-center gap-3 text-sm font-semibold text-[#020826]">
+                {item.icon}
+                <span>{item.label}</span>
+              </div>
+            );
+
+            return (
+              <div
+                key={item.label}
+                className={`flex items-center justify-between rounded-xl px-3 py-2 transition ${
+                  item.active ? "bg-[#f9f4ef] shadow-[0px_4px_6px_rgba(0,0,0,0.1)]" : "text-[#716040] hover:bg-[#f6f1e7]"
+                }`}
+              >
+                {item.to ? <Link to={item.to}>{content}</Link> : content}
+                {typeof item.count === "number" && (
+                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#8c7851] text-xs font-bold text-white">
+                    {item.count}
+                  </span>
+                )}
+              </div>
+            );
+          })}
 
           <div className="pt-6">
             <Link to="/login">

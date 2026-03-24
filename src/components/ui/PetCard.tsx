@@ -36,7 +36,16 @@ export function PetCard({
       tabIndex={onClick ? 0 : undefined}
     >
       <div className="h-16 w-16 rounded-lg overflow-hidden flex-shrink-0">
-        <img src={pet.image} alt={pet.name} className="h-full w-full object-cover" />
+        <img
+          src={pet.image}
+          alt={pet.name}
+          onError={(e) => {
+            const img = e.currentTarget as HTMLImageElement;
+            img.onerror = null;
+            img.src = "/assets/mascotas/perro1.png";
+          }}
+          className="h-full w-full object-cover"
+        />
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between">

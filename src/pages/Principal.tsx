@@ -1,43 +1,36 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { Map, MapControls, MapMarker, MarkerContent, MarkerLabel, MarkerPopup,} from "@/components/ui/map";
+// map primitives are used inside MapWithSearch
 import { Star, Navigation, Clock, ExternalLink } from "lucide-react";
 import { Avatar, Chip, PetCard, Pet, SideNav, Button, Badge, Card } from "../components/ui";
+import MapWithSearch from "../components/ui/MapWithSearch";
+import { assets, normalizeImage } from "@/lib/imageUtils";
 import Modal from "../components/ui/Modal";
 import type { Mascota } from "../types/mascota";
 import { fetchMascotas } from "../services/mascotaService";
 
-const assets = {
-  max: "/assets/mascotas/perro1.png",
-};
-
-function normalizeImage(url?: string) {
-  if (!url) return assets.max;
-  if (url.startsWith("http://") || url.startsWith("https://")) return url;
-  if (url.startsWith("public/")) return `/${url.replace(/^public\//, "")}`;
-  if (url.startsWith("/")) return url;
-  return `/${url}`;
-}
+// image utils moved to src/lib/imageUtils.ts
 
 const navItems = [
-  {
-    label: "Principal",
-    active: true,
-    icon: (
-      <svg className="h-5 w-5 text-[#8c7851]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M3 13h6v8H3z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M15 3h6v18h-6z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
   // {
-  //   label: "Publicar Mascota",
+  //   label: "Principal",
+  //   active: true,
   //   icon: (
   //     <svg className="h-5 w-5 text-[#8c7851]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-  //       <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+  //       <path d="M3 13h6v8H3z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+  //       <path d="M15 3h6v18h-6z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
   //     </svg>
   //   ),
   // },
+  {
+    label: "Publicar Mascota",
+    to: "/reportar",
+    icon: (
+      <svg className="h-5 w-5 text-[#8c7851]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
   // {
   //   label: "Mis Reportes",
   //   icon: (
@@ -75,92 +68,8 @@ const navItems = [
   // },
 ];
 
-export function MyMap({
-  mascotas = [],
-  onVisibleChange,
-}: {
-  mascotas?: Mascota[];
-  onVisibleChange?: (visible: Mascota[]) => void;
-}) {
-  const mapRef = useRef<any>(null);
+// MyMap moved to src/components/ui/MapWithSearch.tsx
 
-  // compute visible mascotas based on map bounds
-  useEffect(() => {
-    const map = mapRef.current as any;
-    if (!map) return;
-
-    const updateVisible = () => {
-      try {
-        const bounds = map.getBounds();
-        const ne = bounds.getNorthEast();
-        const sw = bounds.getSouthWest();
-
-        const visible = mascotas.filter((m) => {
-          if (typeof m.latitud !== "number" || typeof m.longitud !== "number") return false;
-          const lat = m.latitud as number;
-          const lng = m.longitud as number;
-          return lat >= sw.lat && lat <= ne.lat && lng >= sw.lng && lng <= ne.lng;
-        });
-
-        onVisibleChange?.(visible.slice(0, 10));
-      } catch (e) {
-        // ignore until map ready
-      }
-    };
-
-    map.on && map.on("moveend", updateVisible);
-    map.on && map.on("load", updateVisible);
-
-    // initial
-    updateVisible();
-
-    return () => {
-      map.off && map.off("moveend", updateVisible);
-      map.off && map.off("load", updateVisible);
-    };
-  }, [mascotas, onVisibleChange]);
-
-  return (
-    <div className="h-[40vh] sm:h-[50vh] md:h-[60vh] lg:h-[75vh] xl:h-[80vh] w-full">
-      <Map ref={mapRef} center={[-75.56843, 6.270]} zoom={11}>
-        <MapControls position="bottom-right" showZoom showCompass showLocate showFullscreen />
-
-        {mascotas
-          .filter((m) => typeof m.longitud === "number" && typeof m.latitud === "number")
-          .map((m) => (
-            <MapMarker key={m.id} longitude={m.longitud as number} latitude={m.latitud as number}>
-              <MarkerContent>
-                <div className="size-6 rounded-full overflow-hidden border-2 border-white shadow-lg cursor-pointer hover:scale-110 transition-transform">
-                  <img src={normalizeImage(m.url_imagen)} alt={m.nombre} className="object-cover w-full h-full" />
-                </div>
-                <MarkerLabel position="bottom">{m.nombre}</MarkerLabel>
-              </MarkerContent>
-              <MarkerPopup className="p-0 w-72">
-                <div className="relative h-32 overflow-hidden rounded-t-md w-full">
-                  <img src={normalizeImage(m.url_imagen)} alt={m.nombre} className="object-cover w-full h-full" />
-                </div>
-                <div className="space-y-2 p-3">
-                  <div>
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      {m.tipo}
-                    </span>
-                    <h3 className="font-semibold text-foreground leading-tight">{m.nombre}</h3>
-                  </div>
-                  <div className="text-sm text-muted-foreground">{m.descripcion}</div>
-                  <div className="flex gap-2 pt-1">
-                    <Button size="sm" className="flex-1 h-8">
-                      <Navigation className="size-3.5 mr-1.5" />
-                      Contactar
-                    </Button>
-                  </div>
-                </div>
-              </MarkerPopup>
-            </MapMarker>
-          ))}
-      </Map>
-    </div>
-  );
-}
 
 export function Principal() {
   const navigate = useNavigate();
@@ -209,36 +118,16 @@ export function Principal() {
           - Columna derecha (mapa):contiene marcadores y panel derecho.
         */}
         <div className="flex-1 flex flex-col rounded-3xl border border-[#e5e7eb] bg-[#f9f4ef]">
-          {/* Top bar: buscador centrado y botón Reportar a la derecha */}
-          <div className="px-4 md:px-6 py-4 flex items-center justify-between">
-            <div className="flex-1 max-w-[900px] mx-auto">
-              <div className="flex items-center gap-4 rounded-2xl border border-[#e5e7eb] bg-white/90 px-4 py-2 shadow-sm">
-                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <circle cx="7" cy="7" r="5.5" stroke="#8c7851" strokeWidth="1.5" />
-                  <path d="M11.2 11.2L16 16" stroke="#8c7851" strokeWidth="1.5" strokeLinecap="round" />
-                </svg>
-                <input
-                  className="w-full bg-transparent text-sm font-medium text-[#716040] placeholder:text-[#b7a888] focus:outline-none"
-                  placeholder="Buscar zona, calle o ciudad..."
-                  type="search"
-                />
-              </div>
-            </div>
-            <div className="ml-4 hidden lg:block">
-              <Link to="/reportar">
-                <Button variant="solid" size="md">+ Reportar Mascota</Button>
-              </Link>
-            </div>
-          </div>
+          {/* Top bar removed (search moved into map). */}
 
           {/* Área de contenido: lista a la izquierda y mapa a la derecha */}
           <div className="flex-1 flex gap-6 px-4 md:px-6 pb-6">
             {/* Lista de reportes (desktop) */}
             <div className="hidden lg:flex w-auto max-w-[360px] flex-col">
-              <div className="mb-4 flex items-center justify-between px-2">
+              <div className="mb-4 mt-6 flex items-center justify-between px-16">
                 <h3 className="text-lg font-bold">Mascotas en la zona</h3>
               </div>
-              <div className="space-y-4 overflow-y-auto max-h-[calc(100vh-220px)] pr-2">
+              <div className="space-y-2 overflow-y-auto max-h-[calc(100vh-80px)] pr-2">
                 {visibleMascotas.length > 0 ? (
                   visibleMascotas.slice(0, 20).map((pet) => {
                     const status = (pet.estado || "").toLowerCase().includes("perd") ? ("PERDIDO" as const) : ("ENCONTRADO" as const);
@@ -264,9 +153,13 @@ export function Principal() {
             </div>
 
             {/* Mapa*/}
-            <div className="relative flex-1 overflow-visible rounded-2xl">
-              <MyMap mascotas={mascotas} onVisibleChange={setVisibleMascotas} />
-            </div>
+                <div className="relative flex-1 overflow-visible rounded-2xl">
+                  <MapWithSearch
+                    mascotas={mascotas}
+                    onVisibleChange={setVisibleMascotas}
+                    onSelectMascota={setSelectedMascota}
+                  />
+                </div>
           </div>
         </div>
       </div>
@@ -293,6 +186,11 @@ export function PrincipalModal({
           <img
             src={normalizeImage(mascota.url_imagen)}
             alt={mascota.nombre}
+            onError={(e) => {
+              const img = e.currentTarget as HTMLImageElement;
+              img.onerror = null;
+              img.src = assets.max;
+            }}
             className="max-h-[48vh] w-auto object-contain"
             loading="lazy"
           />
