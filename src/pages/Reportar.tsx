@@ -1,26 +1,13 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Badge, Button, Card, Checkbox, Input, Label } from "../components/ui";
 import { Map, MapControls } from "@/components/ui/map";
+import MapLibreGL from "maplibre-gl";
 
 const API_BASE = (import.meta.env.VITE_API_URL as string) || "http://localhost:400/api";
-
-const assets = {
-  iconCheck: "/assets/icon-check.svg",
-  iconMap: "/assets/icon-map.svg",
-  iconCommunity: "/assets/icon-community.svg",
-  iconAlerts: "/assets/icon-alerts.svg",
-  iconUser: "/assets/icon-user.svg",
-  iconPhone: "/assets/icon-phone.svg",
-  iconLock: "/assets/icon-lock.svg",
-  iconEye: "/assets/icon-eye.svg",
-  iconDot: "/assets/icon-dot.svg",
-  iconArrow: "/assets/icon-arrow.svg",
-};
-
 
 type FormData = {
   estado: string;
@@ -30,10 +17,36 @@ type FormData = {
   descripcion: string;
   fecha_desaparicion: string;
   lugar_desaparicion: string;
-  latitud?: string;
-  longitud?: string;
+  latitud: string;
+  longitud: string;
   url_imagen: string;
 };
+
+const parseFlexibleDate = (value: string): Date | null => {
+  if (!value) return null;
+  // ISO yyyy-mm-dd
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  // dd/mm/yyyy
+  const dmy = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (dmy) {
+    const day = Number(dmy[1]);
+    const month = Number(dmy[2]);
+    const year = Number(dmy[3]);
+    const d = new Date(year, month - 1, day);
+    if (d.getFullYear() === year && d.getMonth() === month - 1 && d.getDate() === day) {
+      return d;
+    }
+    return null;
+  }
+  // Fallback: try Date.parse
+  const fallback = new Date(value);
+  return isNaN(fallback.getTime()) ? null : fallback;
+};
+
+const isValidDate = (value: string) => parseFlexibleDate(value) !== null;
 
 const schema = z
   .object({
@@ -42,10 +55,13 @@ const schema = z
     tipo_otro: z.string().optional(),
     nombre: z.string().optional(),
     descripcion: z.string().min(5, "La descripción es requerida (mín 5 caracteres)"),
-    fecha_desaparicion: z.string().min(1, "La fecha es requerida").refine((val) => !isNaN(Date.parse(val)), {message: "Fecha inválida",}),
+    fecha_desaparicion: z
+      .string()
+      .min(1, "La fecha es requerida")
+      .refine(isValidDate, { message: "Fecha inválida" }),
     lugar_desaparicion: z.string().min(1, "La ubicación es requerida"),
-    latitud: z.string().optional(),
-    longitud: z.string().optional(),
+    latitud: z.string().min(1, "La latitud es requerida"),
+    longitud: z.string().min(1, "La longitud es requerida"),
     url_imagen: z.string().min(1, "La foto es requerida"),
   })
   .superRefine((data, ctx) => {
@@ -80,6 +96,9 @@ export function Reportar() {
     control,
     handleSubmit,
     watch,
+    setValue,
+    setError,
+    clearErrors,
     formState: { errors, isSubmitting },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -97,9 +116,66 @@ export function Reportar() {
     },
   });
 
+  // Map ref and marker for selecting coordinates on map
+  const mapRef = useRef<any>(null);
+  const markerRef = useRef<MapLibreGL.Marker | null>(null);
+
+  useEffect(() => {
+    let attached = false;
+    let cleanup: (() => void) | null = null;
+
+    const tryAttach = () => {
+      const map = mapRef.current as MapLibreGL.Map | null;
+      if (!map || attached) return;
+
+      attached = true;
+
+      const handler = (e: any) => {
+        const lng = e.lngLat?.lng;
+        const lat = e.lngLat?.lat;
+        if (typeof lat !== "number" || typeof lng !== "number") return;
+        setValue("latitud", String(lat));
+        setValue("longitud", String(lng));
+
+        if (!markerRef.current) {
+          markerRef.current = new MapLibreGL.Marker().setLngLat([lng, lat]).addTo(map);
+        } else {
+          markerRef.current.setLngLat([lng, lat]);
+        }
+      };
+
+      map.on("click", handler);
+      map.on("touchend", handler);
+
+      cleanup = () => {
+        map.off("click", handler);
+        map.off("touchend", handler);
+        if (markerRef.current) {
+          markerRef.current.remove();
+          markerRef.current = null;
+        }
+      };
+    };
+
+    // try immediately, else poll until mapRef is set (map component sets ref after mount)
+    tryAttach();
+    const id = setInterval(() => {
+      if (!attached) tryAttach();
+      if (attached) clearInterval(id);
+    }, 200);
+
+    return () => {
+      clearInterval(id);
+      if (cleanup) cleanup();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function onSubmit(data: FormData) {
     try {
-      const payload = { ...data, creadoEn: new Date().toISOString() };
+      const parsed = parseFlexibleDate(data.fecha_desaparicion);
+      const fechaISO = parsed ? parsed.toISOString() : data.fecha_desaparicion;
+      const payload = { ...data, fecha_desaparicion: fechaISO, creadoEn: new Date().toISOString() };
       const res = await fetch(`${API_BASE}/mascotas`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -111,8 +187,10 @@ export function Reportar() {
       return;
     } catch (apiErr) {
       console.debug("API fallback, guardando en localStorage", apiErr);
+      const parsed = parseFlexibleDate(data.fecha_desaparicion);
+      const fechaISO = parsed ? parsed.toISOString() : data.fecha_desaparicion;
       const existing = JSON.parse(localStorage.getItem("rdp_mascotas") || "[]");
-      existing.push({ ...data, creadoEn: new Date().toISOString() });
+      existing.push({ ...data, fecha_desaparicion: fechaISO, creadoEn: new Date().toISOString() });
       localStorage.setItem("rdp_mascotas", JSON.stringify(existing));
       alert("Reporte guardado localmente (fallback)");
       navigate("/");
@@ -286,10 +364,37 @@ export function Reportar() {
                       accept="image/*"
                       onChange={(e) => {
                         const file = e.target.files && e.target.files[0];
-                        if (!file) return field.onChange("");
+                        if (!file) {
+                          clearErrors("url_imagen");
+                          setShowPreview(null);
+                          return field.onChange("");
+                        }
+
+                        const allowed = ["image/jpeg", "image/png", "image/webp"];
+                        const maxBytes = 2 * 1024 * 1024; // 2MB
+
+                        if (!allowed.includes(file.type)) {
+                          setShowPreview(null);
+                          setError("url_imagen", { type: "manual", message: "Formato no válido (jpeg/png/webp)" });
+                          return field.onChange("");
+                        }
+
+                        if (file.size > maxBytes) {
+                          setShowPreview(null);
+                          setError("url_imagen", { type: "manual", message: "La imagen supera 2MB" });
+                          return field.onChange("");
+                        }
+
+                        clearErrors("url_imagen");
                         const reader = new FileReader();
                         reader.onload = () => {
                           const result = String(reader.result ?? "");
+                          // double-check data url mime
+                          if (!/^data:(image\/jpeg|image\/png|image\/webp);base64,/.test(result)) {
+                            setShowPreview(null);
+                            setError("url_imagen", { type: "manual", message: "Formato de imagen inválido" });
+                            return field.onChange("");
+                          }
                           field.onChange(result);
                           setShowPreview(result);
                         };
@@ -331,8 +436,8 @@ export function Reportar() {
 
         <div className="order-2 md:order-2 w-full md:w-6/12 lg:w-7/12 flex-1">
           <div className="relative h-[40vh] sm:h-[50vh] md:h-full md:min-h-[520px] rounded-2xl p-4">
-            <div className="h-full w-full rounded-2xl overflow-hidden">
-              <Map center={[-75.56843, 6.270]} zoom={11}>
+              <div className="h-full w-full rounded-2xl overflow-hidden">
+              <Map ref={mapRef} center={[-75.56843, 6.270]} zoom={11}>
                 <MapControls position="bottom-right" showZoom showCompass showLocate showFullscreen />
               </Map>
             </div>
