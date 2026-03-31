@@ -54,12 +54,12 @@ const schema = z
     tipo: z.string().min(1, "Seleccione el tipo de animal"),
     tipo_otro: z.string().optional(),
     nombre: z.string().optional(),
-    descripcion: z.string().min(5, "La descripción es requerida (mín 5 caracteres)"),
+    descripcion: z.string().min(60, "La descripción es requerida (mín 60 caracteres)"),
     fecha_desaparicion: z
       .string()
       .min(1, "La fecha es requerida")
       .refine(isValidDate, { message: "Fecha inválida" }),
-    lugar_desaparicion: z.string().min(1, "La ubicación es requerida"),
+    lugar_desaparicion: z.string().min(1, "El lugar de desaparicion es requerido"),
     latitud: z.string().min(1, "La latitud es requerida"),
     longitud: z.string().min(1, "La longitud es requerida"),
     url_imagen: z.string().min(1, "La foto es requerida"),
@@ -85,6 +85,12 @@ const schema = z
     }
     if (data.longitud && isNaN(Number(data.longitud))) {
       ctx.addIssue({ code: "custom", message: "Longitud inválida", path: ["longitud"] });
+    }
+    // If the pet is marked as "perdido", nombre becomes required
+    if ((data.estado || "").toLowerCase() === "perdido") {
+      if (!data.nombre || String(data.nombre).trim().length === 0) {
+        ctx.addIssue({ code: "custom", message: "El nombre es requerido cuando la mascota está perdida", path: ["nombre"] });
+      }
     }
 });
 
@@ -115,6 +121,8 @@ export function Reportar() {
       url_imagen: "",
     },
   });
+
+  const estadoValue = watch("estado");
 
   // Map ref and marker for selecting coordinates on map
   const mapRef = useRef<any>(null);
@@ -278,8 +286,11 @@ export function Reportar() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="nombre">Nombre de la mascota (opcional)</Label>
+              <Label htmlFor="nombre">
+                Nombre de la mascota {estadoValue === "perdido" ? <span className="text-[#020826]">(requerido)</span> : <span className="text-[#716040]">(opcional)</span>}
+              </Label>
               <Controller name="nombre" control={control} render={({ field }) => <Input id="nombre" placeholder="Firulais" {...field} />} />
+              {errors.nombre && <p className="text-xs text-[#f25042]">{String(errors.nombre?.message)}</p>}
             </div>
 
             <div className="space-y-2">
@@ -333,8 +344,8 @@ export function Reportar() {
                 {errors.fecha_desaparicion && <p className="text-xs text-[#f25042]">{String(errors.fecha_desaparicion?.message)}</p>}
               </div>
               <div className="space-y-2">
-                <Label>Dirección (lugar)</Label>
-                <Controller name="lugar_desaparicion" control={control} render={({ field }) => <Input placeholder="Dirección o referencia" {...field} />} />
+                <Label>Lugar de desaparición</Label>
+                <Controller name="lugar_desaparicion" control={control} render={({ field }) => <Input placeholder="Localidad o referencia" {...field} />} />
                 {errors.lugar_desaparicion && <p className="text-xs text-[#f25042]">{String(errors.lugar_desaparicion?.message)}</p>}
               </div>
             </div>
