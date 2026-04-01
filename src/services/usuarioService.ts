@@ -1,6 +1,6 @@
 import type { Usuario } from "../types/usuario";
 
-const API_BASE = (import.meta.env.VITE_API_URL as string) || "http://localhost:400/api";
+const API_BASE = (import.meta.env.VITE_API_URL as string) || "http://localhost:4000/api";
 const LOCAL_KEY = "rdp_usuarios";
 
 async function listUsuariosFromApi(): Promise<Usuario[]> {
