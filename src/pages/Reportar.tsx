@@ -4,10 +4,12 @@ import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Badge, Button, Card, Checkbox, Input, Label } from "../components/ui";
+import reporteService from "../services/reporteService";
+import { saveFile } from "../lib/idb";
 import { Map, MapControls } from "@/components/ui/map";
 import MapLibreGL from "maplibre-gl";
 
-const API_BASE = (import.meta.env.VITE_API_URL as string) || "http://localhost:400/api";
+const API_BASE = (import.meta.env.VITE_API_URL as string) || "http://localhost:4000/api";
 
 type FormData = {
   estado: string;
@@ -96,6 +98,7 @@ const schema = z
 
 export function Reportar() {
   const [showPreview, setShowPreview] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const navigate = useNavigate();
 
   const {
@@ -184,12 +187,8 @@ export function Reportar() {
       const parsed = parseFlexibleDate(data.fecha_desaparicion);
       const fechaISO = parsed ? parsed.toISOString() : data.fecha_desaparicion;
       const payload = { ...data, fecha_desaparicion: fechaISO, creadoEn: new Date().toISOString() };
-      const res = await fetch(`${API_BASE}/mascotas`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw new Error("API error");
+      // Send as multipart/form-data (text fields + file)
+      await reporteService.createReporte(payload, selectedFile);
       alert("Reporte enviado");
       navigate("/");
       return;
@@ -197,8 +196,21 @@ export function Reportar() {
       console.debug("API fallback, guardando en localStorage", apiErr);
       const parsed = parseFlexibleDate(data.fecha_desaparicion);
       const fechaISO = parsed ? parsed.toISOString() : data.fecha_desaparicion;
+
+      // If we have a selected File, save it to IndexedDB and store a short reference in the JSON
+      let imageRef = data.url_imagen || null;
+      try {
+        if (selectedFile) {
+          const id = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+          await saveFile(id, selectedFile);
+          imageRef = `localfile:${id}`;
+        }
+      } catch (e) {
+        console.warn("Failed to save file to IndexedDB", e);
+      }
+
       const existing = JSON.parse(localStorage.getItem("rdp_mascotas") || "[]");
-      existing.push({ ...data, fecha_desaparicion: fechaISO, creadoEn: new Date().toISOString() });
+      existing.push({ ...data, url_imagen: imageRef, fecha_desaparicion: fechaISO, creadoEn: new Date().toISOString() });
       localStorage.setItem("rdp_mascotas", JSON.stringify(existing));
       alert("Reporte guardado localmente (fallback)");
       navigate("/");
@@ -404,10 +416,13 @@ export function Reportar() {
                           if (!/^data:(image\/jpeg|image\/png|image\/webp);base64,/.test(result)) {
                             setShowPreview(null);
                             setError("url_imagen", { type: "manual", message: "Formato de imagen inválido" });
+                            setSelectedFile(null);
                             return field.onChange("");
                           }
-                          field.onChange(result);
+                          // keep preview as data URL but store the File object separately
                           setShowPreview(result);
+                          setSelectedFile(file);
+                          field.onChange(file.name);
                         };
                         reader.readAsDataURL(file);
                       }}
