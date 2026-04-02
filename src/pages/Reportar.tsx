@@ -50,6 +50,20 @@ const parseFlexibleDate = (value: string): Date | null => {
 
 const isValidDate = (value: string) => parseFlexibleDate(value) !== null;
 
+function generateUserId(): number {
+  // Simple, robust 10-digit random number using the cryptographic RNG.
+  // Produces values in [1_000_000_000, 9_999_999_999].
+  try {
+    const arr = new Uint32Array(1);
+    window.crypto.getRandomValues(arr);
+    // modulo 9_000_000_000 then shift to minimum 1_000_000_000
+    return 1_000_000_000 + (arr[0] % 9_000_000_000);
+  } catch {
+    // fallback to Math.random if crypto isn't available
+    return Math.floor(1_000_000_000 + Math.random() * 9_000_000_000);
+  }
+}
+
 const schema = z
   .object({
     estado: z.string().min(1, "Seleccione el estado"),
@@ -186,7 +200,8 @@ export function Reportar() {
     try {
       const parsed = parseFlexibleDate(data.fecha_desaparicion);
       const fechaISO = parsed ? parsed.toISOString() : data.fecha_desaparicion;
-      const payload = { ...data, fecha_desaparicion: fechaISO, creadoEn: new Date().toISOString() };
+      const usuario_id = generateUserId();
+      const payload = { ...data, usuario_id, fecha_desaparicion: fechaISO, creadoEn: new Date().toISOString() };
       // Send as multipart/form-data (text fields + file)
       await reporteService.createReporte(payload, selectedFile);
       alert("Reporte enviado");
@@ -209,8 +224,9 @@ export function Reportar() {
         console.warn("Failed to save file to IndexedDB", e);
       }
 
+      const usuario_id = generateUserId();
       const existing = JSON.parse(localStorage.getItem("rdp_mascotas") || "[]");
-      existing.push({ ...data, url_imagen: imageRef, fecha_desaparicion: fechaISO, creadoEn: new Date().toISOString() });
+      existing.push({ ...data, usuario_id, url_imagen: imageRef, fecha_desaparicion: fechaISO, creadoEn: new Date().toISOString() });
       localStorage.setItem("rdp_mascotas", JSON.stringify(existing));
       alert("Reporte guardado localmente (fallback)");
       navigate("/");
