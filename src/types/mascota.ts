@@ -9,7 +9,8 @@ export interface Mascota {
   latitud?: number;
   longitud?: number;
   fecha_publicacion?: string; // ISO datetime
-  url_imagen?: string;
+  imagen_url?: string;
+  thumbnail_url?: string;
 }
 
 export type Mascotas = Mascota[];

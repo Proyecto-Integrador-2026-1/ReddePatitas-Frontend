@@ -1,4 +1,6 @@
-const BASE = (import.meta.env.VITE_API_URL as string) || "http://localhost:4000/api";
+const REPORT_FORM_URL =
+  (import.meta.env.VITE_REPORT_FORM_URL as string) ||
+  "http://localhost:8080/api/reports/form";
 
 async function handleRes(res: Response) {
   if (!res.ok) {
@@ -8,37 +10,28 @@ async function handleRes(res: Response) {
   return res.json();
 }
 
-type TextPayload = { [key: string]: any };
+type TextPayload = Record<string, unknown>;
 
 /**
- * Send a report with text fields and an optional image file.
- * Fields in `payload` will be appended as form fields.
- * The file (if provided) is appended under the `foto` key.
+ * Send a report as multipart/form-data with:
+ * - `payload`: JSON string
+ * - `image`: optional file
  */
 export async function createReporte(payload: TextPayload, file?: File | null) {
   const form = new FormData();
 
-  Object.entries(payload || {}).forEach(([k, v]) => {
-    if (v === undefined || v === null) return;
-    // Convert objects/arrays to JSON strings, keep primitives as-is
-    if (typeof v === "object") {
-      try {
-        form.append(k, JSON.stringify(v));
-      } catch {
-        form.append(k, String(v));
-      }
-    } else {
-      form.append(k, String(v));
-    }
-  });
+  form.append("payload", JSON.stringify(payload ?? {}));
 
   if (file) {
-    form.append("foto", file, file.name);
+    form.append("image", file, file.name);
   }
 
-  const res = await fetch(`${BASE}/mascotas`, {
+  const res = await fetch(REPORT_FORM_URL, {
     method: "POST",
-    // NOTE: Do NOT set Content-Type header when sending FormData; browser sets the boundary
+    headers: {
+      Accept: "application/json",
+    },
+    // Do not set Content-Type manually when using FormData.
     body: form,
   });
 

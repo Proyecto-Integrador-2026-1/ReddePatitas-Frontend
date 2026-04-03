@@ -3,13 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Badge, Button, Card, Checkbox, Input, Label } from "../components/ui";
+import { Button, Card, Input, Label } from "../components/ui";
 import reporteService from "../services/reporteService";
 import { saveFile } from "../lib/idb";
 import { Map, MapControls } from "@/components/ui/map";
 import MapLibreGL from "maplibre-gl";
-
-const API_BASE = (import.meta.env.VITE_API_URL as string) || "http://localhost:4000/api";
 
 type FormData = {
   estado: string;
@@ -49,6 +47,15 @@ const parseFlexibleDate = (value: string): Date | null => {
 };
 
 const isValidDate = (value: string) => parseFlexibleDate(value) !== null;
+
+const toDateOnly = (value: string): string => {
+  const parsed = parseFlexibleDate(value);
+  if (!parsed) return value;
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 
 function generateUserId(): number {
   // Simple, robust 10-digit random number using the cryptographic RNG.
@@ -198,19 +205,27 @@ export function Reportar() {
 
   async function onSubmit(data: FormData) {
     try {
-      const parsed = parseFlexibleDate(data.fecha_desaparicion);
-      const fechaISO = parsed ? parsed.toISOString() : data.fecha_desaparicion;
-      const usuario_id = generateUserId();
-      const payload = { ...data, usuario_id, fecha_desaparicion: fechaISO, creadoEn: new Date().toISOString() };
-      // Send as multipart/form-data (text fields + file)
+      const payload = {
+        userId: generateUserId(),
+        estado: data.estado,
+        tipo: data.tipo === "otros" ? "otro" : data.tipo,
+        tipo_otro: data.tipo === "otros" ? (data.tipo_otro?.trim() || null) : null,
+        nombre: data.nombre?.trim() || "",
+        descripcion: data.descripcion,
+        fecha_desaparicion: toDateOnly(data.fecha_desaparicion),
+        lugar_desaparicion: data.lugar_desaparicion,
+        latitud: Number(data.latitud),
+        longitud: Number(data.longitud),
+        creadoEn: new Date().toISOString(),
+      };
+
       await reporteService.createReporte(payload, selectedFile);
       alert("Reporte enviado");
       navigate("/");
       return;
     } catch (apiErr) {
       console.debug("API fallback, guardando en localStorage", apiErr);
-      const parsed = parseFlexibleDate(data.fecha_desaparicion);
-      const fechaISO = parsed ? parsed.toISOString() : data.fecha_desaparicion;
+      const fechaISO = toDateOnly(data.fecha_desaparicion);
 
       // If we have a selected File, save it to IndexedDB and store a short reference in the JSON
       let imageRef = data.url_imagen || null;
@@ -224,9 +239,22 @@ export function Reportar() {
         console.warn("Failed to save file to IndexedDB", e);
       }
 
-      const usuario_id = generateUserId();
+      const userId = generateUserId();
       const existing = JSON.parse(localStorage.getItem("rdp_mascotas") || "[]");
-      existing.push({ ...data, usuario_id, url_imagen: imageRef, fecha_desaparicion: fechaISO, creadoEn: new Date().toISOString() });
+      existing.push({
+        userId,
+        estado: data.estado,
+        tipo: data.tipo === "otros" ? "otro" : data.tipo,
+        tipo_otro: data.tipo === "otros" ? (data.tipo_otro?.trim() || null) : null,
+        nombre: data.nombre?.trim() || "",
+        descripcion: data.descripcion,
+        fecha_desaparicion: fechaISO,
+        lugar_desaparicion: data.lugar_desaparicion,
+        latitud: Number(data.latitud),
+        longitud: Number(data.longitud),
+        url_imagen: imageRef,
+        creadoEn: new Date().toISOString(),
+      });
       localStorage.setItem("rdp_mascotas", JSON.stringify(existing));
       alert("Reporte guardado localmente (fallback)");
       navigate("/");
@@ -406,6 +434,7 @@ export function Reportar() {
                         if (!file) {
                           clearErrors("url_imagen");
                           setShowPreview(null);
+                          setSelectedFile(null);
                           return field.onChange("");
                         }
 
