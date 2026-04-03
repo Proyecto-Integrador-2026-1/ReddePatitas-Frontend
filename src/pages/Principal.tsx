@@ -7,7 +7,7 @@ import MapWithSearch from "../components/ui/MapWithSearch";
 import { assets, normalizeImage } from "@/lib/imageUtils";
 import Modal from "../components/ui/Modal";
 import type { Mascota } from "../types/mascota";
-import { fetchMascotas } from "../services/mascotaService";
+import { fetchMascotas } from "../services/principalService";
 
 // image utils moved to src/lib/imageUtils.ts
 
@@ -24,7 +24,7 @@ const navItems = [
   // },
   {
     label: "Publicar Mascota",
-    to: "/reportar",
+    to: "/reporte",
     icon: (
       <svg className="h-5 w-5 text-[#8c7851]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -69,6 +69,17 @@ const navItems = [
 ];
 
 // MyMap moved to src/components/ui/MapWithSearch.tsx
+
+const formatShortDate = (value?: string) => {
+  if (!value) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return new Intl.DateTimeFormat("es-CO", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+  }).format(parsed);
+};
 
 
 export function Principal() {
@@ -138,9 +149,10 @@ export function Principal() {
                           name: pet.nombre,
                           status,
                           description: pet.descripcion || "",
-                          time: pet.fecha_publicacion || "",
+                          time: formatShortDate(pet.fecha_publicacion),
                           location: pet.lugar_desaparicion || "",
-                          image: normalizeImage(pet.url_imagen),
+                          image: normalizeImage(pet.thumbnail_url),
+                          backupImage: normalizeImage(pet.imagen_url),
                         }}
                         onClick={() => setSelectedMascota(pet)}
                       />
@@ -184,10 +196,15 @@ export function PrincipalModal({
       <div className="space-y-4">
         <div className="w-full flex items-center justify-center bg-gray-50 rounded-xl overflow-hidden">
           <img
-            src={normalizeImage(mascota.url_imagen)}
+            src={normalizeImage(mascota.imagen_url)}
             alt={mascota.nombre}
             onError={(e) => {
               const img = e.currentTarget as HTMLImageElement;
+              const backup = normalizeImage(mascota.thumbnail_url);
+              if (backup && img.src !== backup) {
+                img.src = backup;
+                return;
+              }
               img.onerror = null;
               img.src = assets.max;
             }}
@@ -197,7 +214,7 @@ export function PrincipalModal({
         </div>
         <div>
           <h2 className="text-xl font-bold">{mascota.nombre}</h2>
-          <div className="text-sm text-muted-foreground">{mascota.tipo} • {mascota.fecha_publicacion}</div>
+          <div className="text-sm text-muted-foreground">{mascota.tipo} • {formatShortDate(mascota.fecha_publicacion)}</div>
         </div>
         <div className="text-sm text-[#716040]">{mascota.descripcion}</div>
         <div className="text-sm text-[#716040]"><strong>Lugar:</strong> {mascota.lugar_desaparicion}</div>

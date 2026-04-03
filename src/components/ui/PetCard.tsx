@@ -9,6 +9,7 @@ export type Pet = {
   time: string;
   location: string;
   image: string;
+  backupImage?: string;
   highlight?: boolean;
 };
 
@@ -41,6 +42,11 @@ export function PetCard({
           alt={pet.name}
           onError={(e) => {
             const img = e.currentTarget as HTMLImageElement;
+            const backup = pet.backupImage;
+            if (backup && img.src !== backup) {
+              img.src = backup;
+              return;
+            }
             img.onerror = null;
             img.src = "/assets/mascotas/perro1.png";
           }}

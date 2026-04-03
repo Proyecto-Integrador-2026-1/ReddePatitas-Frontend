@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Registro from "./pages/Registro";
 import Principal from "./pages/Principal";
 import Login from "./pages/Login";
-import Reportar from "./pages/Reportar";
+import Reporte from "./pages/Reporte";
 import { Navigate } from "react-router-dom";
 
 function App() {
@@ -14,7 +14,7 @@ function App() {
         <Route path="/mapa" element={<Navigate to="/" replace />} />
         <Route path="/registro" element={<Registro />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/reportar" element={<Reportar />} />
+        <Route path="/reporte" element={<Reporte />} />
       </Routes>
     </BrowserRouter>
   );

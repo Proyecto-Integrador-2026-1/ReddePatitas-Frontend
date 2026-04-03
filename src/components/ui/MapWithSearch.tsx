@@ -5,6 +5,21 @@ import { Button } from ".";
 import type { Mascota } from "@/types/mascota";
 import { assets, normalizeImage } from "@/lib/imageUtils";
 
+const toCoord = (value: unknown): number | undefined => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
+};
+
+const getThumbnail = (m: Mascota): string =>
+  m.thumbnail_url ? normalizeImage(m.thumbnail_url) : "";
+
+const getOriginal = (m: Mascota): string =>
+  m.imagen_url ? normalizeImage(m.imagen_url) : "";
+
 export default function MapWithSearch({
   mascotas = [],
   onVisibleChange,
@@ -60,9 +75,9 @@ export default function MapWithSearch({
         const sw = bounds.getSouthWest();
 
         const visible = mascotas.filter((m) => {
-          if (typeof m.latitud !== "number" || typeof m.longitud !== "number") return false;
-          const lat = m.latitud as number;
-          const lng = m.longitud as number;
+          const lat = toCoord(m.latitud);
+          const lng = toCoord(m.longitud);
+          if (typeof lat !== "number" || typeof lng !== "number") return false;
           return lat >= sw.lat && lat <= ne.lat && lng >= sw.lng && lng <= ne.lng;
         });
 
@@ -114,16 +129,30 @@ export default function MapWithSearch({
           <MapControls position="bottom-right" showZoom showCompass showLocate showFullscreen />
 
           {mascotas
-            .filter((m) => typeof m.longitud === "number" && typeof m.latitud === "number")
-            .map((m) => (
-              <MapMarker key={m.id} longitude={m.longitud as number} latitude={m.latitud as number}>
+            .map((m) => {
+              const lng = toCoord(m.longitud);
+              const lat = toCoord(m.latitud);
+              if (typeof lng !== "number" || typeof lat !== "number") return null;
+
+              const thumbnailSrc = getThumbnail(m);
+              const originalSrc = getOriginal(m);
+              const markerSrc = thumbnailSrc || originalSrc || assets.max;
+
+              return (
+              <MapMarker key={m.id} longitude={lng} latitude={lat}>
                 <MarkerContent>
                   <div className="size-6 rounded-full overflow-hidden border-2 border-white shadow-lg cursor-pointer hover:scale-110 transition-transform">
                     <img
-                      src={normalizeImage(m.url_imagen)}
+                      key={`marker-${m.id}-${thumbnailSrc}`}
+                      src={markerSrc}
                       alt={m.nombre}
                       onError={(e) => {
                         const img = e.currentTarget as HTMLImageElement;
+                        const backup = originalSrc;
+                        if (backup && img.src !== backup) {
+                          img.src = backup;
+                          return;
+                        }
                         img.onerror = null;
                         img.src = assets.max;
                       }}
@@ -134,7 +163,22 @@ export default function MapWithSearch({
                 </MarkerContent>
                 <MarkerPopup className="p-0 w-56">
                   <div className="relative h-24 overflow-hidden rounded-t-md w-full">
-                    <img src={normalizeImage(m.url_imagen)} alt={m.nombre} className="object-cover w-full h-full" />
+                    <img
+                      key={`popup-${m.id}-${thumbnailSrc}`}
+                      src={markerSrc}
+                      alt={m.nombre}
+                      onError={(e) => {
+                        const img = e.currentTarget as HTMLImageElement;
+                        const backup = originalSrc;
+                        if (backup && img.src !== backup) {
+                          img.src = backup;
+                          return;
+                        }
+                        img.onerror = null;
+                        img.src = assets.max;
+                      }}
+                      className="object-cover w-full h-full"
+                    />
                   </div>
 
                   <div className="p-3 flex flex-col space-y-2 max-h-36">
@@ -154,7 +198,8 @@ export default function MapWithSearch({
                   </div>
                 </MarkerPopup>
               </MapMarker>
-            ))}
+            );
+            })}
         </Map>
       </div>
     </div>
