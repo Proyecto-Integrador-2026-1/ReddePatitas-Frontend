@@ -14,15 +14,15 @@ export function Modal({ open, onClose, children }: { open: boolean; onClose: () 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative z-10 w-[90%] max-w-2xl rounded-2xl bg-white p-6 shadow-lg">
+      <div className="relative z-10 w-[90%] max-w-2xl rounded-2xl bg-white p-4 sm:p-6 shadow-lg">
         <button
           aria-label="Cerrar"
           onClick={onClose}
-          className="absolute right-4 top-4 text-sm text-[#716040]"
+          className="absolute right-3 top-3 sm:right-4 sm:top-4 text-sm text-[#716040]"
         >
           ✕
         </button>
-        <div>{children}</div>
+        <div className="max-h-[90vh] overflow-auto">{children}</div>
       </div>
     </div>
   );

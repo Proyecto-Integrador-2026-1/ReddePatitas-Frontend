@@ -1,3 +1,4 @@
+
 const REPORT_FORM_URL =
   (import.meta.env.VITE_REPORT_FORM_URL as string) ||
   "http://localhost:8080/api/reports/form";

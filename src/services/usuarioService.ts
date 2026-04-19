@@ -76,5 +76,70 @@ export default {
 	registerUsuario,
 	findUsuarioByPhone,
 	loginUsuario,
+	updateUsuario,
+		changePassword,
 };
+
+// Update user profile: tries API then falls back to localStorage.
+export async function updateUsuario(updated: Partial<Usuario> & { id?: any }) {
+	const API_BASE_LOCAL = (import.meta.env.VITE_API_URL as string) || "http://localhost:4000/api";
+	// Try API
+	try {
+		if (updated.id) {
+			const res = await fetch(`${API_BASE_LOCAL}/usuarios/${updated.id}`, {
+				method: "PUT",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(updated),
+			});
+			if (res.ok) return { ok: true };
+		}
+	} catch (e) {
+		// ignore and fallback
+	}
+
+	// Fallback to localStorage
+	try {
+		const key = LOCAL_KEY;
+		const raw = localStorage.getItem(key) || "[]";
+		const list: any[] = Array.isArray(JSON.parse(raw)) ? JSON.parse(raw) : [];
+		const idx = list.findIndex((u) => String(u.id) === String(updated.id) || String(u.phone) === String(updated.phone));
+		if (idx !== -1) {
+			list[idx] = { ...list[idx], ...updated };
+			localStorage.setItem(key, JSON.stringify(list));
+			return { ok: true };
+		}
+		return { ok: false, error: "user_not_found" };
+	} catch (e) {
+		return { ok: false, error: String(e) };
+	}
+}
+
+// Change password: verifies current matches (local fallback), updates to new password.
+export async function changePassword(phone: string, current: string, next: string) {
+	const API_BASE_LOCAL = (import.meta.env.VITE_API_URL as string) || "http://localhost:4000/api";
+	try {
+		// attempt API endpoint
+		const res = await fetch(`${API_BASE_LOCAL}/usuarios/change-password`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ phone, current, next }),
+		});
+		if (res.ok) return { ok: true };
+	} catch (e) {
+		// fallback
+	}
+
+	try {
+		const raw = localStorage.getItem(LOCAL_KEY) || "[]";
+		const list: any[] = Array.isArray(JSON.parse(raw)) ? JSON.parse(raw) : [];
+		const idx = list.findIndex((u) => String(u.phone).replace(/\D/g, "") === String(phone).replace(/\D/g, ""));
+		if (idx === -1) return { ok: false, error: "user_not_found" };
+		if (String(list[idx].password ?? "") !== String(current)) return { ok: false, error: "invalid_current_password" };
+		list[idx].password = next;
+		localStorage.setItem(LOCAL_KEY, JSON.stringify(list));
+		return { ok: true };
+	} catch (e) {
+		return { ok: false, error: String(e) };
+	}
+}
 

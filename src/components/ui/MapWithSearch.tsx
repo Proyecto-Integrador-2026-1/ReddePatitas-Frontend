@@ -99,6 +99,41 @@ export default function MapWithSearch({
     };
   }, [mascotas, onVisibleChange]);
 
+  // When mascotas change, fit the map to show all markers (useful for seeded data)
+  useEffect(() => {
+    const map = mapRef.current as any;
+    if (!map) return;
+
+    try {
+      const points = mascotas
+        .map((m) => {
+          const lat = toCoord(m.latitud);
+          const lng = toCoord(m.longitud);
+          if (typeof lat !== "number" || typeof lng !== "number") return null;
+          return { lat, lng };
+        })
+        .filter(Boolean) as { lat: number; lng: number }[];
+
+      if (points.length === 0) return;
+
+      if (points.length === 1) {
+        const p = points[0];
+        map.flyTo({ center: [p.lng, p.lat], zoom: 12, duration: 800 });
+        return;
+      }
+
+      const lats = points.map((p) => p.lat);
+      const lngs = points.map((p) => p.lng);
+      const sw = [Math.min(...lngs), Math.min(...lats)];
+      const ne = [Math.max(...lngs), Math.max(...lats)];
+
+      // fitBounds expects [[swLng, swLat], [neLng, neLat]]
+      map.fitBounds([sw, ne], { padding: 80, duration: 800 });
+    } catch (e) {
+      // ignore map errors
+    }
+  }, [mascotas]);
+
   return (
     <div>
       <div className="px-4 md:px-6 py-4">
