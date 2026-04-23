@@ -8,8 +8,11 @@ import reporteService from "../services/reporteService";
 import { saveFile } from "../lib/idb";
 import { Map, MapControls } from "@/components/ui/map";
 import MapLibreGL from "maplibre-gl";
+import { useAuth } from "../hooks/useAuth";
+import { getUserIdFromToken, getValidToken } from "../utils/jwt";
 
 type FormData = {
+  userid: string;
   estado: string;
   tipo: string;
   tipo_otro?: string;
@@ -57,19 +60,6 @@ const toDateOnly = (value: string): string => {
   return `${year}-${month}-${day}`;
 };
 
-function generateUserId(): number {
-  // Simple, robust 10-digit random number using the cryptographic RNG.
-  // Produces values in [1_000_000_000, 9_999_999_999].
-  try {
-    const arr = new Uint32Array(1);
-    window.crypto.getRandomValues(arr);
-    // modulo 9_000_000_000 then shift to minimum 1_000_000_000
-    return 1_000_000_000 + (arr[0] % 9_000_000_000);
-  } catch {
-    // fallback to Math.random if crypto isn't available
-    return Math.floor(1_000_000_000 + Math.random() * 9_000_000_000);
-  }
-}
 
 const schema = z
   .object({
@@ -86,6 +76,7 @@ const schema = z
     latitud: z.string().min(1, "La latitud es requerida"),
     longitud: z.string().min(1, "La longitud es requerida"),
     url_imagen: z.string().min(1, "La foto es requerida"),
+    userid: z.string().min(1, "El ID del usuario es requerido"),
   })
   .superRefine((data, ctx) => {
     const allowedEstados = ["perdido", "encontrado"];
@@ -118,6 +109,8 @@ const schema = z
 });
 
 export function Reportar() {
+  const { user } = useAuth();
+
   const [showPreview, setShowPreview] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const navigate = useNavigate();
@@ -133,6 +126,7 @@ export function Reportar() {
   } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
+      userid: "",
       estado: "",
       tipo: "",
       tipo_otro: "",
@@ -146,7 +140,27 @@ export function Reportar() {
     },
   });
 
+  // Prefill userid from authenticated user or token (if available)
+  useEffect(() => {
+    if (user && (user as any).id) {
+      setValue("userid", String((user as any).id));
+      return;
+    }
+
+    const tok = getValidToken();
+    if (tok) {
+      const id = getUserIdFromToken(tok);
+      if (id !== null && id !== undefined) {
+        setValue("userid", String(id));
+        // debug log to confirm extracted id during development
+        // eslint-disable-next-line no-console
+        console.debug("JWT userId (extracted):", id);
+      }
+    }
+  }, [user, setValue]);
+
   const estadoValue = watch("estado");
+  const useridValue = watch("userid");
 
   // Map ref and marker for selecting coordinates on map
   const mapRef = useRef<any>(null);
@@ -206,7 +220,7 @@ export function Reportar() {
   async function onSubmit(data: FormData) {
     try {
       const payload = {
-        userId: generateUserId(),
+        userId: data.userid,
         estado: data.estado,
         tipo: data.tipo === "otros" ? "otro" : data.tipo,
         tipo_otro: data.tipo === "otros" ? (data.tipo_otro?.trim() || null) : null,
@@ -239,7 +253,7 @@ export function Reportar() {
         console.warn("Failed to save file to IndexedDB", e);
       }
 
-      const userId = generateUserId();
+      const userId = data.userid;
       const existing = JSON.parse(localStorage.getItem("rdp_mascotas") || "[]");
       existing.push({
         userId,
@@ -480,6 +494,7 @@ export function Reportar() {
             </div>
 
             <div className="space-y-1">
+              <div className="text-sm text-[#716040]">Usuario ID (debug): {String(useridValue || "")}</div>
               <Button className="w-full text-base md:text-lg font-bold py-3 md:py-4" type="submit" disabled={isSubmitting}>
                 {isSubmitting ? "Enviando..." : "Reportar"}
               </Button>

@@ -3,6 +3,9 @@ import { useForm, Controller } from "react-hook-form";
 import type { Resolver } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { Button, Card, Input, Label, Badge } from "../components/ui";
+import Modal from "../components/ui/Modal";
+import usuarioService from "../services/usuarioService";
+import { useAuth } from "../hooks/useAuth";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
@@ -26,20 +29,8 @@ const featureHighlights = [
 ];
 
 const schema = z.object({
-  phone: z.preprocess(
-    (val) => {
-      if (typeof val !== "string") return "";
-      return val.replace(/\D/g, "");
-    },
-    z.string().min(10, "El teléfono es requerido").regex(/^\d{10}$/, "El teléfono debe contener exactamente 10 dígitos")
-  ),
-  password: z.preprocess(
-    (val) => (typeof val === "string" ? val : ""),
-    z
-      .string()
-      .min(6, "Mínimo 6 caracteres")
-      .regex(/(?=.*[A-Z])(?=.*\d)/, "Al menos una mayúscula y un número")
-  ),
+  email: z.string().min(1, "El correo es requerido").email("Correo inválido"),
+  password: z.preprocess((val) => (typeof val === "string" ? val : ""), z.string().min(6, "Mínimo 6 caracteres")),
   remember: z.boolean().optional(),
 });
 
@@ -52,62 +43,42 @@ export function Login() {
     formState: { errors, isSubmitting },
   } = useForm<LoginData>({
     resolver: zodResolver(schema) as Resolver<LoginData>,
-    defaultValues: { phone: "", password: "", remember: false },
+    defaultValues: { email: "", password: "", remember: false },
   });
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalMessage, setModalMessage] = useState("");
+  const [modalSuccess, setModalSuccess] = useState(false);
+
+  function handleCloseModal() {
+    setModalOpen(false);
+    if (modalSuccess) {
+      navigate("/");
+    }
+  }
+
+  const { login } = useAuth();
 
   async function onSubmit(data: LoginData) {
-    // Normalize inputs
-    const phone = String(data.phone ?? "").replace(/\D/g, "").trim();
+    const email = String((data as any).email ?? "").trim();
     const password = String(data.password ?? "").trim();
 
-    // Try authenticating against local json-server first
-    try {
-      // Fetch all users and search client-side to avoid json-server query edge-cases
-      const res = await fetch(`${API_BASE}/usuarios`);
-      if (res.ok) {
-        const users = await res.json();
-        console.debug("json-server returned users count", Array.isArray(users) ? users.length : 0);
-        const list = Array.isArray(users) ? users : [users];
-        // Normalize stored phone/password and compare strictly
-        const user = list.find((u: any) => {
-          const storedPhone = String(u.phone ?? "").replace(/\D/g, "").trim();
-          const storedPass = String(u.password ?? "").trim();
-          return storedPhone === phone && storedPass === password;
-        });
-        if (user) {
-          localStorage.setItem("rdp_last_login", JSON.stringify({ phone, at: new Date().toISOString() }));
-          alert("Login exitoso: " + phone);
-          navigate("/");
-          return;
-        }
-        // If users found but none matched, log list for debugging
-        if (list.length > 0 && !user) {
-          console.debug("No matching user/password found. Sample stored entries:", list.map((u: any) => ({ phone: u.phone, password: u.password })));
-        }
-      }
-    } catch (e) {
-      console.debug("json-server auth error", e);
+    const result = await usuarioService.loginUsuario(email, password);
+    if (!result.ok) {
+      setModalMessage(String(result.error || "Credenciales inválidas"));
+      setModalSuccess(false);
+      setModalOpen(true);
+      return;
     }
 
-    // Fallback: check localStorage keys used by other helpers
-    try {
-      const registrations = JSON.parse(localStorage.getItem("rdp_registrations") || "[]");
-      const stored = JSON.parse(localStorage.getItem("rdp_usuarios") || "[]");
-      const all = Array.isArray(registrations) ? registrations.concat(stored || []) : stored || [];
-      const found = all.find((u: any) => String(u.phone) === String(data.phone) && String(u.password) === String(data.password));
-      if (found) {
-        localStorage.setItem("rdp_last_login", JSON.stringify({ phone: data.phone, at: new Date().toISOString() }));
-        alert("Login exitoso (local): " + data.phone);
-        navigate("/");
-        return;
-      }
-    } catch (err) {
-      console.debug("localStorage fallback error", err);
+    if (result.token) {
+      login(result.token);
     }
-
-    alert("Credenciales inválidas (intenta registrar primero)");
+    localStorage.setItem("rdp_last_login", JSON.stringify({ email, at: new Date().toISOString() }));
+    setModalMessage("Login exitoso");
+    setModalSuccess(true);
+    setModalOpen(true);
   }
 
   return (
@@ -127,26 +98,16 @@ export function Login() {
 
           <form className="mt-8 space-y-4" onSubmit={handleSubmit(onSubmit)} noValidate>
             <div className="space-y-2">
-              <Label htmlFor="phone">Número telefónico</Label>
+              <Label htmlFor="email">Correo electrónico</Label>
               <Controller
-                name="phone"
+                name="email"
                 control={control}
                 render={({ field }) => (
-                  <Input
-                    id="phone"
-                    type="tel"
-                    placeholder="3004567890"
-                    icon={<img src={assets.iconPhone} alt="teléfono" className="h-4 w-4" />}
-                    inputMode="numeric"
-                    pattern="\d*"
-                    {...(field as any)}
-                    value={String(field.value ?? "")}
-                    onChange={(e) => field.onChange(String((e.target as HTMLInputElement).value).replace(/\D/g, ""))}
-                  />
+                  <Input id="email" type="email" placeholder="juan.perez@correo.com" {...(field as any)} />
                 )}
               />
               <div className="min-h-[20px]">
-                {errors.phone && <p className="text-xs text-[#f25042]">{String(errors.phone.message)}</p>}
+                {errors.email && <p className="text-xs text-[#f25042]">{String((errors.email as any)?.message)}</p>}
               </div>
             </div>
             <div className="space-y-2">
@@ -225,6 +186,23 @@ export function Login() {
           </div>
         </Card>
 
+        <Modal open={modalOpen} onClose={handleCloseModal}>
+          <div className={`p-6 ${modalSuccess ? "bg-white" : "bg-white"}` }>
+            <div className="flex items-center gap-4">
+              <div className={`h-12 w-12 flex items-center justify-center rounded-full ${modalSuccess ? "bg-green-100" : "bg-red-100"}`}>
+                <span className="text-2xl">{modalSuccess ? '✅' : '❌'}</span>
+              </div>
+              <div>
+                <p className="text-lg font-semibold">{modalSuccess ? 'Login exitoso' : 'Error'}</p>
+                <p className="text-sm text-[#5c4e34]">{modalMessage}</p>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end">
+              <Button onClick={handleCloseModal}>Cerrar</Button>
+            </div>
+          </div>
+        </Modal>
+
         <div className="hidden lg:block flex-1 space-y-10">
                   <Card className="relative overflow-hidden rounded-[32px] border-[#f0e7d9] shadow-[0px_25px_50px_rgba(0,0,0,0.25)]">
                     <div className="relative min-h-[320px] sm:min-h-[420px] lg:min-h-[520px]">
@@ -276,7 +254,6 @@ export function Login() {
                       <p className="text-base font-semibold text-[#020826]">+1,240 mascotas reunidas</p>
                       <p className="text-sm text-[#716040]">Gracias a la comunidad, cada reporte cuenta.</p>
                     </div>
-                    <Badge tone="success" className="ml-auto">Comunidad Shadcn</Badge>
                   </div>
                 </div>
               </div>
