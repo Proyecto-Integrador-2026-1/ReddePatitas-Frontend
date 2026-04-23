@@ -2,7 +2,9 @@ import React, { useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Badge, Button, Card, Checkbox, Input, Label } from "@/components/ui";
+import { Badge, Button, Card, Input, Label } from "@/components/ui";
+import Modal from "@/components/ui/Modal";
+import { registerUsuario } from "@/services/usuarioService";
 
 const assets = {
   hero: "/assets/registro-hero.png",
@@ -40,14 +42,15 @@ const featureHighlights = [
 ];
 
 const passwordHints = [
-  "Mínimo 6 caracteres",
-  "Al menos una letra mayúscula y un número",
+  "Mínimo 8 caracteres",
+  "No debe contener espacios",
 ];
 
 type FormData = {
   firstName: string;
   lastName: string;
   phone: string;
+  email: string;
   password: string;
   confirm: string;
   accept: boolean;
@@ -55,13 +58,15 @@ type FormData = {
 
 const schema = z
   .object({
-    firstName: z.string().min(1, "El nombre es requerido"),
-    lastName: z.string().min(1, "El apellido es requerido"),
-    phone: z.string().min(1, "El teléfono es requerido").regex(/^[0-9]+$/, "El teléfono solo debe contener números").length(10, "El teléfono debe tener exactamente 10 dígitos"),
+    firstName: z.string().trim().min(1, "El nombre es requerido").max(255, "Máximo 255 caracteres"),
+    lastName: z.string().trim().min(1, "El apellido es requerido").max(255, "Máximo 255 caracteres"),
+    phone: z.string().regex(/^\d{7,15}$/, "El teléfono debe tener entre 7 y 15 dígitos"),
+    email: z.string().trim().min(1, "El correo es requerido").email("Correo inválido"),
     password: z
       .string()
-      .min(6, "Mínimo 6 caracteres")
-      .regex(/(?=.*[A-Z])(?=.*\d)/, "Al menos una mayúscula y un número"),
+      .min(8, "Mínimo 8 caracteres")
+      .max(128, "Máximo 128 caracteres")
+      .refine((v) => !/\s/.test(v), "La contraseña no debe contener espacios"),
     confirm: z.string().min(1, "Confirmar contraseña"),
     accept: z.boolean().refine((v) => v === true, { message: "Debes aceptar los términos" }),
   })
@@ -73,10 +78,14 @@ const schema = z
 
 export function Registro() {
   const [showPassword, setShowPassword] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalMessage, setModalMessage] = useState("");
+  const [modalSuccess, setModalSuccess] = useState(false);
 
   const {
     control,
     handleSubmit,
+    reset,
     formState: { errors, isSubmitting },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -84,20 +93,38 @@ export function Registro() {
       firstName: "",
       lastName: "",
       phone: "",
+      email: "",
       password: "",
       confirm: "",
       accept: false,
     },
   });
+  
 
   async function onSubmit(data: FormData) {
     try {
-      const { registerUser } = await import("../lib/api");
-      await registerUser(data);
-      alert("Registro guardado localmente");
+      const result = await registerUsuario({
+        firstName: data.firstName,
+        lastName: data.lastName,
+        phone: data.phone,
+        email: data.email,
+        password: data.password,
+      });
+      if (!result.ok) {
+        throw new Error(result.error || "No se pudo registrar el usuario");
+      }
+      // éxito: mostrar modal y limpiar formulario
+      setModalMessage("Registro exitoso. Bienvenido a Red de Patitas 🎉");
+      setModalSuccess(true);
+      setModalOpen(true);
+      // limpiar formulario
+      reset();
     } catch (err) {
       console.error(err);
-      alert("Error al enviar");
+      // mostrar modal de error y NO limpiar formulario
+      setModalMessage(err instanceof Error ? err.message : "Error al enviar");
+      setModalSuccess(false);
+      setModalOpen(true);
     }
   }
 
@@ -164,13 +191,39 @@ export function Registro() {
                 name="phone"
                 control={control}
                 render={({ field }) => (
-                  <Input id="phone" placeholder="3004567890" icon={<img src={assets.iconPhone} alt="teléfono" className="h-4 w-4" />} {...field} />
+                  <Input
+                    id="phone"
+                    placeholder="3004567890"
+                    icon={<img src={assets.iconPhone} alt="teléfono" className="h-4 w-4" />}
+                    inputMode="numeric"
+                    pattern="\d*"
+                    {...field}
+                    value={String(field.value ?? "")}
+                    onChange={(e) => field.onChange(String(e.target.value).replace(/\D/g, ""))}
+                  />
                 )}
               />
               <div className="min-h-[20px]">
                 {errors.phone && <p className="text-xs text-[#f25042]">{String(errors.phone.message)}</p>}
               </div>
-              <p className="text-xs text-[#5c4e34]">Formato: +57 seguido de 10 dígitos</p>
+              <p className="text-xs text-[#5c4e34]">Formato: solo números, entre 7 y 15 dígitos</p>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center gap-1">
+                <Label htmlFor="email">Correo electrónico</Label>
+                <span className="text-[#f25042]">*</span>
+              </div>
+              <Controller
+                name="email"
+                control={control}
+                render={({ field }) => (
+                  <Input id="email" type="email" placeholder="juan.perez@correo.com" {...field} />
+                )}
+              />
+              <div className="min-h-[20px]">
+                {errors.email && <p className="text-xs text-[#f25042]">{String(errors.email.message)}</p>}
+              </div>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
@@ -299,6 +352,23 @@ export function Registro() {
             </div>
           </form>
         </Card>
+        
+        <Modal open={modalOpen} onClose={() => setModalOpen(false)}>
+          <div className={`p-6 ${modalSuccess ? "bg-white" : "bg-white"}` }>
+            <div className="flex items-center gap-4">
+              <div className={`h-12 w-12 flex items-center justify-center rounded-full ${modalSuccess ? "bg-green-100" : "bg-red-100"}`}>
+                <span className="text-2xl">{modalSuccess ? '✅' : '❌'}</span>
+              </div>
+              <div>
+                <p className="text-lg font-semibold">{modalSuccess ? 'Registro exitoso' : 'Error'}</p>
+                <p className="text-sm text-[#5c4e34]">{modalMessage}</p>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end">
+              <Button onClick={() => setModalOpen(false)}>Cerrar</Button>
+            </div>
+          </div>
+        </Modal>
 
         <div className="hidden lg:block flex-1 space-y-10">
           <Card className="relative overflow-hidden rounded-[32px] border-[#f0e7d9] shadow-[0px_25px_50px_rgba(0,0,0,0.25)]">
