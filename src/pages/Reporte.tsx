@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
@@ -51,13 +51,11 @@ const parseFlexibleDate = (value: string): Date | null => {
 
 const isValidDate = (value: string) => parseFlexibleDate(value) !== null;
 
-const toDateOnly = (value: string): string => {
-  const parsed = parseFlexibleDate(value);
-  if (!parsed) return value;
-  const year = parsed.getFullYear();
-  const month = String(parsed.getMonth() + 1).padStart(2, "0");
-  const day = String(parsed.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+const toISOWithUTC = (dateStr: string): string => {
+  const parsed = parseFlexibleDate(dateStr); // ya tienes esta función
+  if (!parsed) return "";
+  // Asegurar UTC a medianoche
+  return new Date(Date.UTC(parsed.getFullYear(), parsed.getMonth(), parsed.getDate())).toISOString();
 };
 
 
@@ -150,8 +148,9 @@ export function Reportar() {
     const tok = getValidToken();
     if (tok) {
       const id = getUserIdFromToken(tok);
+      console.log("Token extraído, userid:", id);
       if (id !== null && id !== undefined) {
-        setValue("userid", String(id));
+        setValue("userid", id);
         // debug log to confirm extracted id during development
         // eslint-disable-next-line no-console
         console.debug("JWT userId (extracted):", id);
@@ -220,13 +219,13 @@ export function Reportar() {
   async function onSubmit(data: FormData) {
     try {
       const payload = {
-        userId: data.userid,
+        userid: data.userid,
         estado: data.estado,
         tipo: data.tipo === "otros" ? "otro" : data.tipo,
         tipo_otro: data.tipo === "otros" ? (data.tipo_otro?.trim() || null) : null,
         nombre: data.nombre?.trim() || "",
         descripcion: data.descripcion,
-        fecha_desaparicion: toDateOnly(data.fecha_desaparicion),
+        fecha_desaparicion: toISOWithUTC(data.fecha_desaparicion),
         lugar_desaparicion: data.lugar_desaparicion,
         latitud: Number(data.latitud),
         longitud: Number(data.longitud),
@@ -239,7 +238,7 @@ export function Reportar() {
       return;
     } catch (apiErr) {
       console.debug("API fallback, guardando en localStorage", apiErr);
-      const fechaISO = toDateOnly(data.fecha_desaparicion);
+      const fechaISO = toISOWithUTC(data.fecha_desaparicion);
 
       // If we have a selected File, save it to IndexedDB and store a short reference in the JSON
       let imageRef = data.url_imagen || null;
@@ -253,10 +252,10 @@ export function Reportar() {
         console.warn("Failed to save file to IndexedDB", e);
       }
 
-      const userId = data.userid;
+      const userid = data.userid;
       const existing = JSON.parse(localStorage.getItem("rdp_mascotas") || "[]");
       existing.push({
-        userId,
+        userid: userid,
         estado: data.estado,
         tipo: data.tipo === "otros" ? "otro" : data.tipo,
         tipo_otro: data.tipo === "otros" ? (data.tipo_otro?.trim() || null) : null,

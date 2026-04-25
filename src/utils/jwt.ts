@@ -23,15 +23,11 @@ export const decodeJWT = (token: string): JWTPayload | null => {
 /**
  * Extrae `userId` del token JWT si está presente.
  */
-export const getUserIdFromToken = (token: string): number | null => {
-  try {
-    const decoded = decodeJWT(token);
-    if (!decoded) return null;
-    return typeof decoded.userId === 'number' ? decoded.userId : null;
-  } catch (e) {
-    console.error('Error extrayendo userId del token:', e);
-    return null;
-  }
+export const getUserIdFromToken = (token: string): string | null => {
+  const decoded = decodeJWT(token);
+  if (!decoded) return null;
+  // El UUID está en el campo 'userid'
+  return decoded.userid ?? null;
 };
 
 /**

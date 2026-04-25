@@ -7,10 +7,7 @@ type StoredUsuario = Usuario & {
 
 type RegisterPayload = Pick<Usuario, "firstName" | "lastName" | "phone" | "email" | "password">;
 
-const API_URL_RAW = (import.meta.env.VITE_API_URL as string) || "http://localhost:4000";
-const API_BASE = API_URL_RAW.replace(/\/+$/, "").endsWith("/api")
-  ? API_URL_RAW.replace(/\/+$/, "")
-  : `${API_URL_RAW.replace(/\/+$/, "")}/api`;
+const API_BASE = import.meta.env.VITE_AUTH_API_URL;
 const REGISTER_ENDPOINT = `${API_BASE}/v1/auth/register`;
 const LOGIN_ENDPOINT = `${API_BASE}/v1/auth/login`;
 const LOCAL_KEY = "rdp_usuarios";

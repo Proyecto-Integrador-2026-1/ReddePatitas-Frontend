@@ -1,6 +1,6 @@
 export interface JWTPayload {
   sub: string;        // username
-  userId: number;     // ID del usuario
+  userid: string;     // ID del usuario
   roles: string[];    // Lista de roles
   iat: number;        // Issued at (timestamp)
   exp: number;        // Expiration (timestamp)
