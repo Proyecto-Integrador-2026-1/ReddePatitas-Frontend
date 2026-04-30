@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 // map primitives are used inside MapWithSearch
 import { Star, Navigation, Clock, ExternalLink } from "lucide-react";
 import { Avatar, Chip, PetCard, Pet, SideNav, Button, Badge, Card } from "../components/ui";
+import ReportModal from "../components/ui/ReportModal";
 import MapWithSearch from "../components/ui/MapWithSearch";
 import { assets, normalizeImage } from "@/lib/imageUtils";
 import Modal from "../components/ui/Modal";
@@ -55,6 +56,7 @@ const navItems = [
   },
   {
     label: "Mi Perfil",
+    to: "/perfil",
     authOnly: true,
     icon: (
       <svg className="h-5 w-5 text-[#716040]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -93,6 +95,8 @@ export function Principal() {
   const [mascotas, setMascotas] = useState<Mascota[]>([]);
   const [visibleMascotas, setVisibleMascotas] = useState<Mascota[]>([]);
   const [selectedMascota, setSelectedMascota] = useState<Mascota | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportedVersion, setReportedVersion] = useState(0);
 
   useEffect(() => {
     let mounted = true;
@@ -181,7 +185,21 @@ export function Principal() {
           </div>
         </div>
       </div>
-      <PrincipalModal mascota={selectedMascota} onClose={() => setSelectedMascota(null)} />
+      <PrincipalModal
+        mascota={selectedMascota}
+        onClose={() => setSelectedMascota(null)}
+        onOpenReport={() => setReportOpen(true)}
+        reportedVersion={reportedVersion}
+      />
+      <ReportModal
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        publicationId={selectedMascota?.id ?? ""}
+        onReported={() => {
+          setReportOpen(false);
+          setReportedVersion((v) => v + 1);
+        }}
+      />
     </div>
   );
 }
@@ -191,11 +209,29 @@ export function Principal() {
 export function PrincipalModal({
   mascota,
   onClose,
+  onOpenReport,
+  reportedVersion,
 }: {
   mascota: Mascota | null;
   onClose: () => void;
+  onOpenReport?: () => void;
+  reportedVersion?: number;
 }) {
   if (!mascota) return null;
+
+  // determine if current user already reported this publication
+  const { user } = useAuth();
+  const userId = String(user?.id || "");
+  const reportedKey = `rdp_reported_${userId}`;
+  const alreadyReported = (() => {
+    try {
+      const raw = localStorage.getItem(reportedKey) || "[]";
+      const list = JSON.parse(raw);
+      return Array.isArray(list) && list.includes(mascota.id);
+    } catch {
+      return false;
+    }
+  })();
 
   return (
     <Modal open={!!mascota} onClose={onClose}>
@@ -224,10 +260,21 @@ export function PrincipalModal({
         </div>
         <div className="text-sm text-[#716040]">{mascota.descripcion}</div>
         <div className="text-sm text-[#716040]"><strong>Lugar:</strong> {mascota.lugar_desaparicion}</div>
-        <div className="flex gap-2 pt-2">
-          <Button variant="solid" size="md">Contactar</Button>
-          <Button variant="ghost" size="md" onClick={onClose}>Cerrar</Button>
-        </div>
+          <div className="flex gap-2 pt-2">
+            <Button variant="solid" size="md">Contactar</Button>
+            <Button
+              variant="solid"
+              size="md"
+              onClick={() => {
+                if (!alreadyReported) onOpenReport?.();
+              }}
+              disabled={alreadyReported}
+              style={{ backgroundColor: alreadyReported ? '#f87171' : '#dc2626', color: '#ffffff', borderColor: alreadyReported ? '#f87171' : '#dc2626' }}
+            >
+              {alreadyReported ? 'Reportado' : 'Reportar'}
+            </Button>
+            <Button variant="ghost" size="md" onClick={onClose}>Cerrar</Button>
+          </div>
       </div>
     </Modal>
   );

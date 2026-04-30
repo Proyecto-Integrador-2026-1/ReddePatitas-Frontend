@@ -31,7 +31,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         
         if (decoded) {
           const user: User = {
-            id: decoded.userId,
+            id: decoded.userid,
             username: decoded.sub,
             roles: decoded.roles,
           };
@@ -58,7 +58,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     
     if (decoded) {
       const user: User = {
-        id: decoded.userId,
+        id: decoded.userid,
         username: decoded.sub,
         roles: decoded.roles,
       };
