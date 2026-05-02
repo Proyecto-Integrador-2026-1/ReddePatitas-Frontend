@@ -119,52 +119,6 @@ export async function registerUsuario(payload: RegisterPayload) {
   }
 }
 
-export async function updateUsuario(updated: Partial<StoredUsuario> & { id?: number; phone?: string }) {
-  try {
-    const users = readLocalUsers();
-    const idx = users.findIndex(
-      (u) => (updated.id != null && u.id === updated.id) ||
-        (updated.phone != null && normalizePhone(u.phone) === normalizePhone(updated.phone))
-    );
-
-    if (idx === -1) {
-      return { ok: false, error: "user_not_found" };
-    }
-
-    const merged = { ...users[idx], ...updated };
-    if (typeof merged.phone === "string") {
-      merged.phone = normalizePhone(merged.phone);
-    }
-    users[idx] = merged;
-    writeLocalUsers(users);
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, error: String(e) };
-  }
-}
-
-export async function changePassword(phone: string, current: string, next: string) {
-  try {
-    if (next.length < 8 || next.length > 128 || /\s/.test(next)) {
-      return { ok: false, error: "invalid_new_password" };
-    }
-
-    const users = readLocalUsers();
-    const idx = users.findIndex((u) => normalizePhone(u.phone) === normalizePhone(phone));
-    if (idx === -1) {
-      return { ok: false, error: "user_not_found" };
-    }
-    if (String(users[idx].password ?? "") !== String(current ?? "")) {
-      return { ok: false, error: "invalid_current_password" };
-    }
-
-    users[idx].password = String(next);
-    writeLocalUsers(users);
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, error: String(e) };
-  }
-}
 
 export async function loginUsuario(emailOrPhone: string, password: string) {
   // prefer email-based login for backend
@@ -203,7 +157,5 @@ export async function loginUsuario(emailOrPhone: string, password: string) {
 
 export default {
   registerUsuario,
-  loginUsuario,
-  updateUsuario,
-  changePassword,
+  loginUsuario
 };
