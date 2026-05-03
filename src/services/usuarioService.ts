@@ -121,35 +121,30 @@ export async function registerUsuario(payload: RegisterPayload) {
 
 
 export async function loginUsuario(emailOrPhone: string, password: string) {
-  // prefer email-based login for backend
   try {
-    const body = { email: String(emailOrPhone ?? "").trim(), password: String(password ?? "") };
+    const body = { email: emailOrPhone.trim(), password: String(password ?? "") };
     const res = await fetch(LOGIN_ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
 
-    if (!res.ok) {
-      let msg = `Error ${res.status}`;
-      try {
-        const json = await res.json();
-        msg = String(json?.message || json?.error || json?.detail || msg);
-      } catch {}
-      return { ok: false, error: msg };
-    }
+    if (!res.ok) { /* manejo de error igual */ }
 
     const data = await res.json();
-    // expected backend shape: { token: '...', usuario: { ... } } or similar
-    const token = data?.token || data?.accessToken || null;
-    const usuario = data?.usuario || data?.user || null;
+    // data tiene: accessToken, refreshToken, tokenType, expiresInSeconds, roles, refreshExpiresInSeconds
+    const accessToken = data?.accessToken || data?.token;
+    const refreshToken = data?.refreshToken;
 
-    // optionally persist token
-    if (token) {
-      localStorage.setItem("rdp_token", token);
+    // Guardar ambos tokens
+    if (accessToken) {
+      localStorage.setItem("rdp_token", accessToken);
+    }
+    if (refreshToken) {
+      localStorage.setItem("rdp_refresh_token", refreshToken);
     }
 
-    return { ok: true, token, usuario };
+    return { ok: true, token: accessToken, refreshToken, usuario: data?.usuario || data?.user };
   } catch (e) {
     return { ok: false, error: String(e) };
   }

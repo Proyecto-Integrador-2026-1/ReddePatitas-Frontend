@@ -72,15 +72,37 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem('rdp_token');
-    setState({
-      user: null,
-      roles: [],
-      isAuthenticated: false,
-      isLoading: false,
-    });
-  };
+const logout = async () => {
+  const accessToken = getValidToken();
+  const refreshToken = localStorage.getItem('rdp_refresh_token');
+
+  if (accessToken && refreshToken) {
+    try {
+      await fetch(`${import.meta.env.VITE_AUTH_API_URL}/v1/auth/logout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
+        body: JSON.stringify({ refreshToken })
+      });
+    } catch (err) {
+      console.warn('Error en logout backend:', err);
+    }
+  }
+
+  // Limpiar almacenamiento local
+  localStorage.removeItem('rdp_token');
+  localStorage.removeItem('rdp_refresh_token');
+
+  // Resetear estado
+  setState({
+    user: null,
+    roles: [],
+    isAuthenticated: false,
+    isLoading: false,
+  });
+};
 
   const hasRole = (roleOrRoles: Role | Role[]): boolean => {
     const rolesToCheck = Array.isArray(roleOrRoles) ? roleOrRoles : [roleOrRoles];

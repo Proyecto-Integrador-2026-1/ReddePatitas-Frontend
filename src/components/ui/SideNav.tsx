@@ -8,9 +8,7 @@ export type NavItem = {
   active?: boolean;
   count?: number;
   icon?: React.ReactNode;
-  /** Optional route to navigate when the item is clicked */
   to?: string;
-  /** If true, only show this item to authenticated users */
   authOnly?: boolean;
 };
 
@@ -18,91 +16,89 @@ type SideNavProps = {
   items: NavItem[];
 };
 
+function AuthButton() {
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+
+  const handleClick = async () => {
+    if (user) {
+      await logout();
+      navigate('/');
+    } else {
+      navigate('/login');
+    }
+  };
+
+  return (
+    <Button variant="solid" size="md" className="w-full" onClick={handleClick}>
+      {user ? 'Cerrar sesión' : 'Acceder'}
+    </Button>
+  );
+}
+
 export function SideNav({ items }: SideNavProps) {
   const { isAuthenticated } = useAuth();
-  // Only show items allowed for the current auth state
   const visibleItems = items.filter((item) => !item.authOnly || isAuthenticated);
-  // Split visible items into two groups: top (first 4) and bottom (rest)
   const splitIndex = Math.min(4, visibleItems.length);
   const topItems = visibleItems.slice(0, splitIndex);
   const bottomItems = visibleItems.slice(splitIndex);
 
   return (
-    // make nav full-height and distribute content so Acceder stays at the bottom
     <nav className="h-full flex flex-col justify-between">
       <div className="space-y-3">
-          {topItems.map((item) => {
-            const content = (
-              <div className="flex items-center gap-3 text-sm font-semibold text-[#020826]">
-                {item.icon}
-                <span>{item.label}</span>
-              </div>
-            );
-
-            return (
-              <div
-                key={item.label}
-                className={`flex items-center justify-between rounded-xl px-3 py-2 transition ${
-                  item.active ? "bg-[#f9f4ef] shadow-[0px_4px_6px_rgba(0,0,0,0.1)]" : "text-[#716040] hover:bg-[#f6f1e7]"
-                }`}
-              >
-                {item.to ? <Link to={item.to}>{content}</Link> : content}
-                {typeof item.count === "number" && (
-                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#8c7851] text-xs font-bold text-white">
-                    {item.count}
-                  </span>
-                )}
-              </div>
-            );
-          })}
+        {topItems.map((item) => {
+          const content = (
+            <div className="flex items-center gap-3 text-sm font-semibold text-[#020826]">
+              {item.icon}
+              <span>{item.label}</span>
+            </div>
+          );
+          return (
+            <div
+              key={item.label}
+              className={`flex items-center justify-between rounded-xl px-3 py-2 transition ${
+                item.active ? "bg-[#f9f4ef] shadow-[0px_4px_6px_rgba(0,0,0,0.1)]" : "text-[#716040] hover:bg-[#f6f1e7]"
+              }`}
+            >
+              {item.to ? <Link to={item.to}>{content}</Link> : content}
+              {typeof item.count === "number" && (
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#8c7851] text-xs font-bold text-white">
+                  {item.count}
+                </span>
+              )}
+            </div>
+          );
+        })}
       </div>
 
-      <div>
-        <div className="pt-3 border-t border-[#e5e7eb] space-y-3">
-          {bottomItems.map((item) => {
-            const content = (
-              <div className="flex items-center gap-3 text-sm font-semibold text-[#020826]">
-                {item.icon}
-                <span>{item.label}</span>
-              </div>
-            );
-
-            return (
-              <div
-                key={item.label}
-                className={`flex items-center justify-between rounded-xl px-3 py-2 transition ${
-                  item.active ? "bg-[#f9f4ef] shadow-[0px_4px_6px_rgba(0,0,0,0.1)]" : "text-[#716040] hover:bg-[#f6f1e7]"
-                }`}
-              >
-                {item.to ? <Link to={item.to}>{content}</Link> : content}
-                {typeof item.count === "number" && (
-                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#8c7851] text-xs font-bold text-white">
-                    {item.count}
-                  </span>
-                )}
-              </div>
-            );
-          })}
-
-          <div className="pt-6">
-            <LoginButton />
-          </div>
+      <div className="pt-3 border-t border-[#e5e7eb] space-y-3">
+        {bottomItems.map((item) => {
+          const content = (
+            <div className="flex items-center gap-3 text-sm font-semibold text-[#020826]">
+              {item.icon}
+              <span>{item.label}</span>
+            </div>
+          );
+          return (
+            <div
+              key={item.label}
+              className={`flex items-center justify-between rounded-xl px-3 py-2 transition ${
+                item.active ? "bg-[#f9f4ef] shadow-[0px_4px_6px_rgba(0,0,0,0.1)]" : "text-[#716040] hover:bg-[#f6f1e7]"
+              }`}
+            >
+              {item.to ? <Link to={item.to}>{content}</Link> : content}
+              {typeof item.count === "number" && (
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#8c7851] text-xs font-bold text-white">
+                  {item.count}
+                </span>
+              )}
+            </div>
+          );
+        })}
+        <div className="pt-6">
+          <AuthButton />
         </div>
       </div>
     </nav>
-  );
-}
-
-function LoginButton() {
-  const navigate = useNavigate();
-  return (
-    <Button
-      variant="solid"
-      size="md"
-      className="w-full"
-      onClick={() => navigate('/login')}
-    >
-      Acceder
-    </Button>
   );
 }
