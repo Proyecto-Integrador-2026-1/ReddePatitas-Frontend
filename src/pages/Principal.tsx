@@ -11,6 +11,8 @@ import type { Mascota } from "../types/mascota";
 import { fetchMascotas } from "../services/principalService";
 
 import { useAuth } from '../hooks/useAuth';
+import messagingService from '../services/mensajeriaService';
+import reportService from '../services/reportPublicationService';
 import { RoleGuard } from '../components/RoleGuard';
 
 // image utils moved to src/lib/imageUtils.ts
@@ -55,6 +57,16 @@ const navItems = [
     ),
   },
   {
+    label: "Mensajes",
+    to: "/conversations",
+    authOnly: true,
+    icon: (
+      <svg className="h-5 w-5 text-[#716040]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M3 8a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4v6a4 4 0 0 1-4 4H7l-4 4V8z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
     label: "Mi Perfil",
     to: "/perfil",
     authOnly: true,
@@ -76,6 +88,9 @@ const navItems = [
   // },
 ];
 
+// total unread messages across conversations
+// computed in the Principal component and injected into SideNav
+
 // MyMap moved to src/components/ui/MapWithSearch.tsx
 
 const formatShortDate = (value?: string) => {
@@ -92,9 +107,11 @@ const formatShortDate = (value?: string) => {
 
 export function Principal() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [mascotas, setMascotas] = useState<Mascota[]>([]);
   const [visibleMascotas, setVisibleMascotas] = useState<Mascota[]>([]);
   const [selectedMascota, setSelectedMascota] = useState<Mascota | null>(null);
+  const [totalUnread, setTotalUnread] = useState<number>(0);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportedVersion, setReportedVersion] = useState(0);
 
@@ -110,6 +127,55 @@ export function Principal() {
       mounted = false;
     };
   }, []);
+
+  // compute total unread messages across conversations (limited to first N to avoid heavy load)
+  useEffect(() => {
+    let mounted = true;
+    const compute = async () => {
+      try {
+        const userId = user?.id ?? null;
+        if (!userId) return;
+        const convs: any[] = await messagingService.listConversations(String(userId)).catch(() => []);
+        if (!Array.isArray(convs) || convs.length === 0) {
+          if (mounted) setTotalUnread(0);
+          return;
+        }
+        const limit = 12;
+        const toCheck = convs.slice(0, limit);
+        const settled = await Promise.allSettled(toCheck.map((c) => messagingService.getConversationMessages(String(c.id || c.conversacionId || c.conversationId), String(userId))));
+        let total = 0;
+        for (const s of settled) {
+          if (s.status !== 'fulfilled') continue;
+          const msgs = Array.isArray((s as any).value) ? (s as any).value : [];
+          const unread = msgs.filter((m: any) => {
+            const from = String(m.remitenteId || m.senderId || m.from || '').toLowerCase();
+            const mine = from === String(userId).toLowerCase();
+            if (mine) return false;
+            const estado = String(m.estado || m.status || '').toLowerCase();
+            if (estado) {
+              const readStates = ['leido', 'visto', 'read', 'seen', 'readed'];
+              const unreadStates = ['enviado', 'sent', 'nuevo', 'new', 'unread'];
+              if (readStates.includes(estado)) return false;
+              if (unreadStates.includes(estado)) return true;
+            }
+            const readFlag = m.leido ?? m.read ?? m.visto ?? null;
+            const readAt = m.readAt ?? m.leidoAt ?? m.leido_fecha ?? null;
+            if (readFlag !== null) return !Boolean(readFlag);
+            if (readAt) return false;
+            if (m.unread !== undefined) return Boolean(m.unread);
+            return true;
+          }).length;
+          total += unread;
+        }
+        if (mounted) setTotalUnread(total);
+      } catch (e) {
+        // ignore
+      }
+    };
+    compute();
+    const iv = setInterval(compute, 30000);
+    return () => { mounted = false; clearInterval(iv); };
+  }, [user?.id]);
 
   return (
     <div className="min-h-screen bg-[#f5f1ea] text-[#020826]">
@@ -130,7 +196,7 @@ export function Principal() {
             </div>
             <p className="text-xl font-bold">Red de Patitas</p>
           </div>
-          <SideNav items={navItems} />
+          <SideNav items={navItems.map((it) => (it.label === 'Mensajes' ? { ...it, count: totalUnread } : it))} />
         </aside>
 
         {/*
@@ -222,6 +288,14 @@ export function PrincipalModal({
   // determine if current user already reported this publication
   const { user } = useAuth();
   const userId = String(user?.id || "");
+  const [contactOpen, setContactOpen] = useState(false);
+  const [contactLoading, setContactLoading] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
+  const [ownerId, setOwnerId] = useState<string | null>(null);
+  const [reportChecking, setReportChecking] = useState(false);
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sentOk, setSentOk] = useState(false);
   const reportedKey = `rdp_reported_${userId}`;
   const alreadyReported = (() => {
     try {
@@ -233,9 +307,19 @@ export function PrincipalModal({
     }
   })();
 
+  // hide success message after a short timeout
+  useEffect(() => {
+    if (!sentOk) return;
+    const id = setTimeout(() => setSentOk(false), 3000);
+    return () => clearTimeout(id);
+  }, [sentOk]);
+
   return (
     <Modal open={!!mascota} onClose={onClose}>
       <div className="space-y-4">
+        {sentOk ? (
+          <div className="mx-auto w-full max-w-md text-center bg-green-50 border border-green-200 text-green-800 px-4 py-2 rounded">mensaje enviado</div>
+        ) : null}
         <div className="w-full flex items-center justify-center bg-gray-50 rounded-xl overflow-hidden">
           <img
             src={normalizeImage(mascota.imagen_url)}
@@ -260,21 +344,125 @@ export function PrincipalModal({
         </div>
         <div className="text-sm text-[#716040]">{mascota.descripcion}</div>
         <div className="text-sm text-[#716040]"><strong>Lugar:</strong> {mascota.lugar_desaparicion}</div>
-          <div className="flex gap-2 pt-2">
-            <Button variant="solid" size="md">Contactar</Button>
-            <Button
-              variant="solid"
-              size="md"
-              onClick={() => {
-                if (!alreadyReported) onOpenReport?.();
-              }}
-              disabled={alreadyReported}
-              style={{ backgroundColor: alreadyReported ? '#f87171' : '#dc2626', color: '#ffffff', borderColor: alreadyReported ? '#f87171' : '#dc2626' }}
-            >
-              {alreadyReported ? 'Reportado' : 'Reportar'}
-            </Button>
-            <Button variant="ghost" size="md" onClick={onClose}>Cerrar</Button>
+
+        {/* Message tab: small absolute panel above modal content */}
+        {contactOpen && user ? (
+          <div className="absolute left-1/2 top-12 z-50 w-[min(720px,90%)] -translate-x-1/2 bg-white border rounded-lg p-4 shadow-lg">
+            {isOwner ? (
+              <div className="text-sm text-muted-foreground">Esta es tu publicación</div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between">
+                  <strong className="text-sm">Enviar mensaje</strong>
+                  <button className="text-sm text-muted-foreground" onClick={() => { setContactOpen(false); setMessage(''); }}>✕</button>
+                </div>
+                <textarea
+                  className="w-full mt-2 rounded-md border p-3 text-sm"
+                  rows={6}
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                />
+                <div className="flex mt-3 justify-end gap-2">
+                  <Button
+                    variant="solid"
+                    size="md"
+                    onClick={async () => {
+                      if (isOwner) {
+                        // extra guard: prevent sending to self
+                        alert('Esta es tu publicación');
+                        return;
+                      }
+                      if (!message.trim()) return;
+                      setSending(true);
+                      try {
+                        const dto = { reportId: mascota.id, conversacionId: null, contenido: message };
+                        await messagingService.sendMessage(dto, userId);
+                        setSentOk(true);
+                        setMessage('');
+                        setContactOpen(false);
+                      } catch (err) {
+                        console.error('Error enviando mensaje', err);
+                        alert('No se pudo enviar el mensaje');
+                      } finally {
+                        setSending(false);
+                      }
+                    }}
+                    disabled={sending || isOwner}
+                  >
+                    {sending ? 'Enviando...' : 'Enviar'}
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
+        ) : null}
+
+        {/* Buttons row: Contactar, Reportar, Cerrar */}
+        <div className="flex gap-2 pt-2">
+          <Button
+            variant="solid"
+            size="md"
+            onClick={async () => {
+              setContactLoading(true);
+              try {
+                const resp = await messagingService.getContactByReport(mascota.id, userId);
+                const oid = resp?.ownerId ?? null;
+                const detectedOwner = Boolean(resp?.isOwner === true || (oid && String(oid).toLowerCase().trim() === String(userId).toLowerCase().trim()));
+
+                setOwnerId(oid);
+                setIsOwner(detectedOwner);
+
+                if (detectedOwner) {
+                  alert('Esta es tu publicación');
+                  setContactOpen(false);
+                } else {
+                  setContactOpen(true);
+                }
+              } catch (err) {
+                console.error('Error obteniendo contacto', err);
+                alert('Error al verificar la propiedad de la publicación');
+              } finally {
+                setContactLoading(false);
+              }
+            }}
+            disabled={contactLoading}
+          >
+            {contactLoading ? 'Cargando...' : 'Contactar'}
+          </Button>
+
+          <Button
+            variant="solid"
+            size="md"
+            onClick={async () => {
+              if (alreadyReported) return;
+              setReportChecking(true);
+              try {
+                const resp = await reportService.getContactByReport(mascota.id, userId);
+                const oid = resp?.ownerId ?? null;
+                const detectedOwner = Boolean(resp?.isOwner === true || (oid && String(oid).toLowerCase().trim() === String(userId).toLowerCase().trim()));
+                setOwnerId(oid);
+                setIsOwner(detectedOwner);
+                if (detectedOwner) {
+                  alert('Esta es tu publicación');
+                  return;
+                }
+                onOpenReport?.();
+              } catch (err) {
+                console.error('Error verificando propietario antes de reportar', err);
+                // fallback: open report modal if verification fails
+                onOpenReport?.();
+              } finally {
+                setReportChecking(false);
+              }
+            }}
+            disabled={reportChecking}
+            style={{ backgroundColor: alreadyReported ? '#f87171' : '#dc2626', color: '#ffffff', borderColor: alreadyReported ? '#f87171' : '#dc2626' }}
+          >
+            {reportChecking ? 'Comprobando...' : alreadyReported ? 'Reportado' : 'Reportar'}
+          </Button>
+
+          <Button variant="ghost" size="md" onClick={onClose}>Cerrar</Button>
+        </div>
       </div>
     </Modal>
   );
