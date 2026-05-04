@@ -135,8 +135,11 @@ export function Principal() {
       try {
         const userId = user?.id ?? null;
         if (!userId) return;
-        const convs: any[] = await messagingService.listConversations(String(userId)).catch(() => []);
-        if (!Array.isArray(convs) || convs.length === 0) {
+        const resp = await messagingService
+          .listConversations(String(userId))
+          .catch(() => ({ conversations: [] as any[], totalUnread: 0 }));
+        const convs: any[] = Array.isArray(resp?.conversations) ? resp.conversations : [];
+        if (convs.length === 0) {
           if (mounted) setTotalUnread(0);
           return;
         }
