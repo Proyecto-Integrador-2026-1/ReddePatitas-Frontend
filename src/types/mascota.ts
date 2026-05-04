@@ -1,5 +1,6 @@
 export interface Mascota {
   id: string;
+  userid: string;
   nombre: string;
   tipo: 'Perro' | 'Gato' | string;
   estado: string;

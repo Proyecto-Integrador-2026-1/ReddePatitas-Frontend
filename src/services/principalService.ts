@@ -27,6 +27,7 @@ const mapReportToMascota = (report: Record<string, unknown>): Mascota => {
 
 	return {
 		id: String(report.id ?? ""),
+		userid: String(report.userId ?? report.publicadorId ?? ""),
 		nombre: String(report.nombre ?? "Sin nombre"),
 		tipo: String(report.tipo ?? report.tipoMascota ?? "Mascota"),
 		estado: String(report.estado ?? report.tipoReporte ?? "encontrado"),
