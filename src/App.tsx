@@ -5,8 +5,8 @@ import Principal from "./pages/Principal";
 import Login from "./pages/Login";
 import Reporte from "./pages/Reporte";
 import Perfil from "./pages/Perfil";
-import Mensajes from "./pages/Bandeja";
 import { Navigate } from "react-router-dom";
+import Bandeja from "./pages/Bandeja";
 
 function App() {
   return (
@@ -18,7 +18,7 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/reporte" element={<Reporte />} />
         <Route path="/perfil" element={<Perfil />} />
-        <Route path="/conversations" element={<Mensajes />} />
+        <Route path="/conversations" element={<Bandeja />} />
       </Routes>
     </BrowserRouter>
   );

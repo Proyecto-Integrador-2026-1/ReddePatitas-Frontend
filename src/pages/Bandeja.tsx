@@ -29,11 +29,11 @@ export default function MessagesPage() {
     const load = async () => {
       setLoadingConvs(true);
       try {
-        const convs = await messagingService.listConversations(userId);
+        const resp = await messagingService.listConversations(userId);
         if (!mounted) return;
-        const rawConvs = Array.isArray(convs) ? convs : [];
 
-        // fetch reports list once to resolve image/name fields reliably
+        const rawConvs = Array.isArray(resp?.conversations) ? resp.conversations : [];
+
         let reportsIndex: Record<string, any> | null = null;
         try {
           const list = await fetchMascotas();
@@ -47,14 +47,25 @@ export default function MessagesPage() {
           reportsIndex = null;
         }
 
-        // normalize conversations to expected display fields, preferring report data from reportsIndex
         const norm = rawConvs.map((c: any) => {
-          const id = c.id || c.conversacionId || c.conversationId || c.conversation?.id || c.reportId || c.report?.id || '';
+          const id =
+            c.id ||
+            c.conversacionId ||
+            c.conversationId ||
+            c.conversation?.id ||
+            c.reportId ||
+            c.report?.id ||
+            '';
 
           const reportCandidateId = c.report?.id || c.reportId || null;
           const reportEntry = reportCandidateId && reportsIndex ? reportsIndex[reportCandidateId] : null;
 
-          const mascotaName = reportEntry?.nombre || reportEntry?.pet?.nombre || c?.mascota?.nombre || c.mascotaName || 'Mascota sin nombre';
+          const mascotaName =
+            reportEntry?.nombre ||
+            reportEntry?.pet?.nombre ||
+            c?.mascota?.nombre ||
+            c.mascotaName ||
+            'Mascota sin nombre';
 
           const rawThumbCandidates = [
             reportEntry?.thumbnail_url,
@@ -71,94 +82,126 @@ export default function MessagesPage() {
           let thumbnail = normalizeImage(rawThumb);
           if (!rawThumb || thumbnail === assets.max) thumbnail = assets.max;
 
-          const otherPerson = (c.participants && Array.isArray(c.participants) && c.participants.find((p: any) => String(p.id) !== String(userId))) || c.publisher || c.publicador || c.owner || c.report?.usuario || null;
-          const publisherName = otherPerson?.nombre || otherPerson?.nombreCompleto || otherPerson?.fullName || otherPerson?.displayName || otherPerson?.username || otherPerson?.userName || c.nombrePublicador || c.publisherName || '';
-          const publisherId = otherPerson?.id || c.publisherId || c.ownerId || c.publicadorId || '';
+          const otherPerson =
+            (c.participants &&
+              Array.isArray(c.participants) &&
+              c.participants.find((p: any) => String(p.id) !== String(userId))) ||
+            c.publisher ||
+            c.publicador ||
+            c.owner ||
+            c.report?.usuario ||
+            null;
+
+          const publisherName =
+            otherPerson?.nombre ||
+            otherPerson?.nombreCompleto ||
+            otherPerson?.fullName ||
+            otherPerson?.displayName ||
+            otherPerson?.username ||
+            otherPerson?.userName ||
+            c.nombrePublicador ||
+            c.publisherName ||
+            '';
+
+          const publisherId =
+            otherPerson?.id || c.publisherId || c.ownerId || c.publicadorId || '';
 
           const lastMessage = c.lastMessage || c.ultimoMensaje || c.last || null;
 
-          return { ...c, id: String(id), mascotaName, thumbnail, publisherId, publisherName, lastMessage };
+          return {
+            ...c,
+            id: String(id),
+            mascotaName,
+            thumbnail,
+            publisherId,
+            publisherName,
+            lastMessage,
+          };
         });
+
         setConversations(norm);
-        // no debug logs
-        // compute unread counts by fetching recent messages for each conversation (limited concurrency)
+
         (async () => {
           try {
-            const limit = 12; // avoid too many parallel requests
+            const limit = 12;
             const toCheck = norm.slice(0, limit);
-            const results = await Promise.allSettled(toCheck.map((cv: any) => messagingService.getConversationMessages(String(cv.id), userId)));
+            const results = await Promise.allSettled(
+              toCheck.map((cv: any) =>
+                messagingService.getConversationMessages(String(cv.id), userId)
+              )
+            );
             const updates: Record<string, number> = {};
             results.forEach((r, i) => {
               if (r.status !== 'fulfilled' || !Array.isArray((r as any).value)) return;
               const msgs: any[] = (r as any).value;
               const unread = msgs.filter((m: any) => {
-                // message is incoming to current user
                 const from = String(m.remitenteId || m.senderId || m.from || '').toLowerCase();
                 const mine = from === String(userId).toLowerCase();
                 if (mine) return false;
 
-                // prefer explicit status field (spanish `estado` or english `status`)
                 const estado = String(m.estado || m.status || '').toLowerCase();
                 if (estado) {
                   const readStates = ['leido', 'visto', 'read', 'seen', 'readed'];
                   const unreadStates = ['enviado', 'sent', 'nuevo', 'new', 'unread', 'no-leido', 'no_leido'];
                   if (readStates.includes(estado)) return false;
                   if (unreadStates.includes(estado)) return true;
-                  // unknown estado -> fallthrough to other heuristics
                 }
 
-                // determine read flag candidates
                 const readFlag = m.leido ?? m.read ?? m.visto ?? null;
                 const readAt = m.readAt ?? m.leidoAt ?? m.leido_fecha ?? null;
                 if (readFlag !== null) return !Boolean(readFlag);
                 if (readAt) return false;
 
-                // fallback: if message carries explicit `unread` truthy marker
                 if (m.unread !== undefined) return Boolean(m.unread);
-
-                // last-resort: treat as unread if message has no read metadata and is recent
                 return true;
               }).length;
               if (unread > 0) updates[String(toCheck[i].id)] = unread;
             });
             if (Object.keys(updates).length) {
-              setConversations((prev) => prev.map((p: any) => ({ ...p, unreadCount: updates[String(p.id)] || p.unreadCount || 0 })));
+              setConversations((prev) =>
+                prev.map((p: any) => ({
+                  ...p,
+                  unreadCount: updates[String(p.id)] || p.unreadCount || 0,
+                }))
+              );
             }
-          } catch (e) {
-            // ignore errors computing unread counts
-          }
+          } catch (e) {}
         })();
-        // Additional enrichment: try to resolve publisherName from report contact endpoint when missing
+
         (async () => {
           try {
-            const toEnrich = norm.filter((c: any) => (!c.publisherName || c.publisherName.length === 0) && (c.report?.id || c.reportId)).slice(0, 12);
+            const toEnrich = norm
+              .filter((c: any) => (!c.publisherName || c.publisherName.length === 0) && (c.report?.id || c.reportId))
+              .slice(0, 12);
             if (toEnrich.length === 0) return;
-            const results = await Promise.allSettled(toEnrich.map((c: any) => messagingService.getContactByReport(c.report?.id || c.reportId, userId)));
+            const results = await Promise.allSettled(
+              toEnrich.map((c: any) =>
+                messagingService.getContactByReport(c.report?.id || c.reportId, userId)
+              )
+            );
             results.forEach((r, i) => {
               if (r.status !== 'fulfilled' || !(r as any).value) return;
               const body = (r as any).value.raw ?? (r as any).value;
               if (!body) return;
-              // try common owner/contact shapes
               const owner = body.owner || body.publicador || body.user || body.usuario || body.contact || null;
               let name = null;
               if (owner) name = owner.nombre || owner.fullName || owner.displayName || owner.username || owner.userName || owner.nombreCompleto || null;
-              // some endpoints return top-level fields like ownerName, contactName
               if (!name) name = body.ownerName || body.contactName || body.nombrePublicador || null;
               if (name) {
                 const convId = String(toEnrich[i].id);
-                setConversations((prev) => prev.map((p: any) => (String(p.id) === convId ? { ...p, publisherName: name } : p)));
-                if (selectedConv?.id === convId) setSelectedConv((s: any) => (s ? { ...s, publisherName: name } : s));
+                setConversations((prev) =>
+                  prev.map((p: any) => (String(p.id) === convId ? { ...p, publisherName: name } : p))
+                );
+                if (selectedConv?.id === convId) {
+                  setSelectedConv((s: any) => (s ? { ...s, publisherName: name } : s));
+                }
               }
             });
-          } catch (e) {
-            // ignore enrichment errors
-          }
+          } catch (e) {}
         })();
-        
-        // Enrichment: try to fetch missing mascotaName / publisherName from API
+
         (async () => {
           for (const conv of norm) {
-            // prepare candidate ids for pet
             const petCandidates = [
               conv.mascota?.id,
               conv.report?.pet?.id,
@@ -171,7 +214,6 @@ export default function MessagesPage() {
             ].filter(Boolean);
 
             if ((!conv.mascotaName || conv.mascotaName === 'Mascota sin nombre') && petCandidates.length) {
-              // first try to resolve from reportsIndex (GET /api/reports returns list with imagen/thumbnail)
               const reportCandidateId = conv.report?.id || conv.reportId || null;
               if (reportCandidateId && reportsIndex && reportsIndex[reportCandidateId]) {
                 const rep = reportsIndex[reportCandidateId];
@@ -186,7 +228,6 @@ export default function MessagesPage() {
                   setConversations((prev) => prev.map((p: any) => (p.id === conv.id ? { ...p, thumbnail: thumb } : p)));
                   if (selectedConv?.id === conv.id) setSelectedConv((s: any) => (s ? { ...s, thumbnail: thumb } : s));
                 }
-                // if found in reportsIndex, skip per-id fetches
                 if (petNameFromRep || petImgFromRep) continue;
               }
 
@@ -211,22 +252,17 @@ export default function MessagesPage() {
                     updated = true;
                   }
                   if (updated) break;
-                } catch (e) {
-                  // ignore and try next
-                }
+                } catch (e) {}
               }
             }
 
-            // publisher/user enrichment: do NOT call /api/users/{id} (no such endpoint)
             if ((!conv.publisherName || conv.publisherName.length === 0)) {
-              // try to obtain from participants or owner fields
               const other = (conv.participants && Array.isArray(conv.participants) && conv.participants.find((p: any) => String(p.id) !== String(userId))) || conv.owner || conv.publicador || conv.publisher || null;
               const fromOther = other ? (other.nombre || other.username || other.userName || null) : null;
               if (fromOther) {
                 setConversations((prev) => prev.map((p: any) => (p.id === conv.id ? { ...p, publisherName: fromOther } : p)));
                 if (selectedConv?.id === conv.id) setSelectedConv((s: any) => (s ? { ...s, publisherName: fromOther } : s));
               } else {
-                // if publisherId matches current user, use auth name
                 const pid = conv.publisherId || conv.ownerId || conv.publicadorId || (other && other.id) || null;
                 if (pid && String(pid) === String(user?.id)) {
                   const selfName = user?.username || (user as any)?.nombre || null;
@@ -235,7 +271,6 @@ export default function MessagesPage() {
                     if (selectedConv?.id === conv.id) setSelectedConv((s: any) => (s ? { ...s, publisherName: selfName } : s));
                   }
                 } else {
-                  // final fallback: short id
                   const fallback = pid ? `Usuario ${String(pid).slice(0, 8)}` : '';
                   if (fallback) {
                     setConversations((prev) => prev.map((p: any) => (p.id === conv.id ? { ...p, publisherName: fallback } : p)));
@@ -246,7 +281,7 @@ export default function MessagesPage() {
             }
           }
         })();
-        // if navigated with a selectedConversationId, auto-select when convs loaded
+
         const selId = (location.state as any)?.selectedConversationId;
         if (selId) {
           const found = norm.find((c: any) => String(c.id) === String(selId));
@@ -270,20 +305,17 @@ export default function MessagesPage() {
     const loadMsgs = async () => {
       setLoadingMsgs(true);
       try {
-      const msgs = await messagingService.getConversationMessages(selectedConv.id, userId);
-      if (!mounted) return;
-      setMessages(Array.isArray(msgs) ? msgs : []);
-      // update UI: clear unread count for this conversation
-      setConversations((prev) => prev.map((p: any) => (p.id === selectedConv.id ? { ...p, unreadCount: 0 } : p)));
+        const msgs = await messagingService.getConversationMessages(selectedConv.id, userId);
+        if (!mounted) return;
+        setMessages(Array.isArray(msgs) ? msgs : []);
+        setConversations((prev) => prev.map((p: any) => (p.id === selectedConv.id ? { ...p, unreadCount: 0 } : p)));
       } catch (err) {
         console.error('Error cargando mensajes', err);
       } finally {
         setLoadingMsgs(false);
-        // scroll
         setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
       }
-      // mark as read on server (do not await to avoid blocking UI)
-      (async () => { try { await messagingService.markConversationAsRead(selectedConv.id, userId); } catch (e) { /* ignore */ } })();
+      (async () => { try { await messagingService.markConversationAsRead(selectedConv.id, userId); } catch (e) {} })();
     };
     loadMsgs();
 
@@ -301,7 +333,6 @@ export default function MessagesPage() {
       const dto = { reportId: null, conversacionId: selectedConv?.id ?? null, contenido: texto };
       await messagingService.sendMessage(dto, userId);
       setTexto('');
-      // reload messages
       const msgs = await messagingService.getConversationMessages(selectedConv.id, userId);
       setMessages(Array.isArray(msgs) ? msgs : []);
       setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
@@ -315,130 +346,136 @@ export default function MessagesPage() {
     if (!conv) return 'Usuario Desconocido';
     if (conv.publisherName && conv.publisherName.length > 0) return conv.publisherName;
 
-    // 1) participants: the other person
     if (conv.participants && Array.isArray(conv.participants)) {
       const other = conv.participants.find((p: any) => String(p.id) !== String(userId));
       if (other) return other.nombre || other.nombreCompleto || other.fullName || other.displayName || other.username || other.userName || 'Usuario Desconocido';
     }
 
-    // 2) common top-level fields or nested report.user
     const otherPerson = conv.publisher || conv.publicador || conv.owner || conv.usuario || conv.report?.usuario || conv.report?.user || null;
     if (otherPerson) return otherPerson.nombre || otherPerson.nombreCompleto || otherPerson.fullName || otherPerson.displayName || otherPerson.username || otherPerson.userName || 'Usuario Desconocido';
 
-    // 3) if publisherId matches authenticated user, use auth name
     const pid = conv.publisherId || conv.ownerId || conv.publicadorId || (conv.participants && Array.isArray(conv.participants) && conv.participants[0]?.id) || null;
     if (pid && String(pid) === String(user?.id)) return user?.username || (user as any)?.nombre || 'Yo';
 
-    // We cannot obtain the other user's real name from the auth service here
-    // because the frontend only has access to the authenticated user's identity.
-    // Return a neutral fallback to avoid showing raw ids.
     return 'Nombre no disponible';
   };
 
   return (
-    <div className="min-h-screen bg-[#f5f1ea] p-4 sm:p-6 relative">
-      <div className="mx-auto max-w-6xl mb-6 px-4">
-        <div className="mb-6 flex items-center gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#020826] text-white">
-            <img src="/assets/huellas.svg" alt="logo" className="h-6 w-6" />
-          </div>
+    <div className="min-h-screen bg-[#f5f1ea] p-4 sm:p-6">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-4">
+        <div className="flex items-center justify-between">
           <div>
-            <p className="text-xl font-semibold">Red de Patitas</p>
-            <div className="text-sm text-muted-foreground font-bold">Bandeja</div>
+            <h1 className="text-2xl font-bold text-[#020826]">Mensajes</h1>
+            <p className="text-sm text-[#716040]">Conversaciones activas</p>
           </div>
+          <Button variant="ghost" size="sm" onClick={() => navigate('/')}>
+            Volver
+          </Button>
         </div>
-      </div>
 
-      <div className="max-w-6xl mx-auto bg-white rounded-2xl shadow-lg ring-1 ring-gray-100 p-4">
-        <div className="mb-3">
-          <h3 className="text-sm font-semibold">Conversaciones</h3>
-        </div>
-        <div className="flex flex-col md:flex-row">
-          <aside className="w-full md:w-80 border-b md:border-b-0 md:border-r pr-0 md:pr-4 pb-4 md:pb-0">
-            {loadingConvs ? (
-              <div>Cargando...</div>
-            ) : (
-              <div className="space-y-2">
-                {conversations.length === 0 ? <div className="text-sm text-muted-foreground">No hay conversaciones</div> : null}
-                {conversations.map((c) => {
-                  const title = c.mascotaName || c.mascota?.nombre || c.id;
-                  const preview = (c.lastMessage && (c.lastMessage.contenido || c.lastMessage.mensaje || c.lastMessage.message)) || '';
-                  const publisher = getDisplayNameForConv(c);
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[320px_1fr]">
+          <div className="rounded-2xl border border-[#e5e7eb] bg-white p-3 shadow-[0px_10px_30px_rgba(0,0,0,0.06)]">
+            <div className="flex items-center justify-between px-2 py-2">
+              <h2 className="text-sm font-semibold text-[#020826]">Conversaciones</h2>
+              {loadingConvs && <span className="text-xs text-[#716040]">Cargando...</span>}
+            </div>
+
+            <div className="max-h-[70vh] space-y-2 overflow-y-auto px-1">
+              {conversations.length === 0 && !loadingConvs ? (
+                <div className="rounded-xl bg-[#f9f4ef] p-4 text-sm text-[#716040]">
+                  Aun no tienes conversaciones.
+                </div>
+              ) : (
+                conversations.map((conv) => {
+                  const isActive = selectedConv?.id === conv.id;
+                  const name = getDisplayNameForConv(conv);
+                  const badge = typeof conv.unreadCount === 'number' ? conv.unreadCount : 0;
                   return (
-                    <div key={c.id} className={`p-2 rounded cursor-pointer ${selectedConv?.id === c.id ? 'bg-[#f3f4f6]' : 'hover:bg-[#f9fafb]'}`} onClick={() => selectConv(c)}>
-                      <div className="flex items-center gap-3">
-                        <Avatar src={c.thumbnail || ''} alt={title} />
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <div className="font-medium text-sm">{title}</div>
-                            {(c.unreadCount || c.unreadMessages || c.unreadMessagesCount || c.unread) > 0 ? (
-                              <Badge tone="warning">{c.unreadCount || c.unreadMessages || c.unreadMessagesCount || c.unread}</Badge>
-                            ) : null}
-                          </div>
-                          <div className="text-xs text-muted-foreground truncate">{publisher || ''} • {preview}</div>
+                    <button
+                      key={conv.id}
+                      type="button"
+                      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition ${
+                        isActive ? 'bg-[#f9f4ef] shadow-[0px_4px_8px_rgba(0,0,0,0.08)]' : 'hover:bg-[#f6f1e7]'
+                      }`}
+                      onClick={() => selectConv(conv)}
+                    >
+                      <Avatar src={conv.thumbnail} fallback={name?.[0] || 'U'} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between">
+                          <span className="truncate text-sm font-semibold text-[#020826]">{name}</span>
+                          {badge > 0 && (
+                            <Badge className="bg-[#8c7851] text-white">{badge}</Badge>
+                          )}
+                        </div>
+                        <div className="truncate text-xs text-[#716040]">
+                          {conv.mascotaName || 'Mascota sin nombre'}
                         </div>
                       </div>
-                    </div>
+                    </button>
                   );
-                })}
+                })
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-[#e5e7eb] bg-white p-4 shadow-[0px_10px_30px_rgba(0,0,0,0.06)]">
+            {!selectedConv ? (
+              <div className="flex h-[60vh] items-center justify-center text-sm text-[#716040]">
+                Selecciona una conversacion para ver los mensajes.
+              </div>
+            ) : (
+              <div className="flex h-[60vh] flex-col">
+                <div className="border-b border-[#e5e7eb] pb-3">
+                  <div className="text-sm font-semibold text-[#020826]">{getDisplayNameForConv(selectedConv)}</div>
+                  <div className="text-xs text-[#716040]">{selectedConv.mascotaName || 'Mascota sin nombre'}</div>
+                </div>
+
+                <div className="flex-1 space-y-2 overflow-y-auto py-4">
+                  {loadingMsgs ? (
+                    <div className="text-sm text-[#716040]">Cargando mensajes...</div>
+                  ) : messages.length === 0 ? (
+                    <div className="text-sm text-[#716040]">No hay mensajes aun.</div>
+                  ) : (
+                    messages.map((msg: any, idx: number) => {
+                      const from = String(msg.remitenteId || msg.senderId || msg.from || '');
+                      const isMine = from && String(userId) === String(from);
+                      return (
+                        <div key={msg.id || idx} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
+                          <div
+                            className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${
+                              isMine
+                                ? 'bg-[#020826] text-white'
+                                : 'bg-[#f9f4ef] text-[#020826]'
+                            }`}
+                          >
+                            {msg.contenido || msg.texto || msg.body || ''}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                  <div ref={messagesEndRef} />
+                </div>
+
+                <div className="mt-3 flex items-center gap-2">
+                  <input
+                    className="h-10 flex-1 rounded-xl border border-[#e5e7eb] bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-[#8c7851]"
+                    placeholder="Escribe un mensaje..."
+                    value={texto}
+                    onChange={(e) => setTexto(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') send();
+                    }}
+                  />
+                  <Button variant="solid" size="sm" onClick={send}>
+                    Enviar
+                  </Button>
+                </div>
               </div>
             )}
-          </aside>
-
-          <main className="flex-1 pt-4 md:pt-0 md:pl-4 flex flex-col">
-            {selectedConv ? (
-              <>
-                <div className="border-b pb-3 mb-3">
-                  <h4 className="font-bold">{selectedConv.mascotaName || selectedConv.title || selectedConv.mascota?.nombre || selectedConv.id}</h4>
-                  <div className="text-xs text-muted-foreground">
-                    {(() => {
-                      const name = getDisplayNameForConv(selectedConv);
-                      return name ? `Publicador: ${name}` : 'Cargando nombre...';
-                    })()}
-                  </div>
-                </div>
-                <div className="flex-1 overflow-auto px-2">
-                  {loadingMsgs ? <div>Cargando mensajes...</div> : (
-                    <div className="space-y-3">
-                      {messages.map((m: any) => {
-                        const mine = String(m.remitenteId || m.senderId || m.from) === String(userId);
-                        return (
-                          <div key={m.id || Math.random()} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
-                            <div className={`${mine ? 'bg-[#dbeafe] text-[#1e3a8a] shadow-md rounded-2xl' : 'bg-[#f3f4f6] text-[#111827] shadow-sm rounded-lg'} max-w-[70%] p-3`}> 
-                              <div className="text-sm">{m.contenido || m.message || m.text}</div>
-                              <div className="text-[11px] text-muted-foreground mt-1">{m.createdAt || m.fechaCreacion || m.fecha || ''}</div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                      <div ref={messagesEndRef} />
-                    </div>
-                  )}
-                </div>
-
-                <div className="mt-3 border-t pt-3">
-                  <div className="flex items-center gap-2 bg-white p-2 rounded-2xl shadow-sm">
-                    <textarea id="mensaje-conversacion" name="mensaje" value={texto} onChange={(e) => setTexto(e.target.value)} rows={2} className="flex-1 rounded-xl border border-gray-100 p-3 outline-none resize-none" placeholder="Escribe un mensaje..." />
-                    <Button variant="solid" size="md" onClick={send} className="shadow-md">Enviar</Button>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="flex-1 flex items-center justify-center text-muted-foreground">Selecciona una conversación</div>
-            )}
-          </main>
+          </div>
         </div>
       </div>
-
-      <button
-        type="button"
-        onClick={() => navigate('/')}
-        aria-label="Cerrar Bandeja y volver"
-        className="absolute right-4 top-4 flex items-center gap-2 rounded-md bg-[#020826] px-3 py-1.5 text-sm text-white hover:bg-[#1a2a4a] transition-colors z-20"
-      >
-        Cerrar
-        <span aria-hidden="true">✕</span>
-      </button>
     </div>
   );
 }

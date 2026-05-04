@@ -9,7 +9,6 @@ import { useAuth } from "../hooks/useAuth";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
-const API_BASE = (import.meta.env.VITE_API_URL as string) || "http://localhost:4000/api";
 
 const assets = {
   hero: "/assets/registro-hero.png",
