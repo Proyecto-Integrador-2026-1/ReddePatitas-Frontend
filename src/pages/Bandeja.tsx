@@ -168,37 +168,6 @@ export default function MessagesPage() {
           } catch (e) {}
         })();
 
-        (async () => {
-          try {
-            const toEnrich = norm
-              .filter((c: any) => (!c.publisherName || c.publisherName.length === 0) && (c.report?.id || c.reportId))
-              .slice(0, 12);
-            if (toEnrich.length === 0) return;
-            const results = await Promise.allSettled(
-              toEnrich.map((c: any) =>
-                messagingService.getContactByReport(c.report?.id || c.reportId, userId)
-              )
-            );
-            results.forEach((r, i) => {
-              if (r.status !== 'fulfilled' || !(r as any).value) return;
-              const body = (r as any).value.raw ?? (r as any).value;
-              if (!body) return;
-              const owner = body.owner || body.publicador || body.user || body.usuario || body.contact || null;
-              let name = null;
-              if (owner) name = owner.nombre || owner.fullName || owner.displayName || owner.username || owner.userName || owner.nombreCompleto || null;
-              if (!name) name = body.ownerName || body.contactName || body.nombrePublicador || null;
-              if (name) {
-                const convId = String(toEnrich[i].id);
-                setConversations((prev) =>
-                  prev.map((p: any) => (String(p.id) === convId ? { ...p, publisherName: name } : p))
-                );
-                if (selectedConv?.id === convId) {
-                  setSelectedConv((s: any) => (s ? { ...s, publisherName: name } : s));
-                }
-              }
-            });
-          } catch (e) {}
-        })();
 
         (async () => {
           for (const conv of norm) {
