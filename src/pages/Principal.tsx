@@ -135,14 +135,7 @@ export function Principal() {
       try {
         const userId = user?.id ?? null;
         if (!userId) return;
-        const res = await messagingService.listConversations(String(userId)).catch(() => null);
-        const convs: any[] = Array.isArray(res) ? res : (res?.conversations ?? []);
-        const apiTotal = res?.totalUnread;
-        if (typeof apiTotal === 'number') {
-          if (mounted) setTotalUnread(apiTotal);
-          return;
-        }
-        // fallback: compute from messages if API didn't return totalUnread
+        const convs: any[] = await messagingService.listConversations(String(userId)).catch(() => []);
         if (!Array.isArray(convs) || convs.length === 0) {
           if (mounted) setTotalUnread(0);
           return;
@@ -296,11 +289,10 @@ export function PrincipalModal({
   const { user } = useAuth();
   const userId = String(user?.id || "");
   const [contactOpen, setContactOpen] = useState(false);
-  // --- VERIFICACIÓN INSTANTÁNEA ---
-  // Comparamos los IDs. Usamos String() por seguridad en caso de que uno sea UUID y otro Number.
-  const isOwner = user && mascota.userid
-    ? String(user.id).toLowerCase() === String(mascota.userid).toLowerCase()
-    : false;
+  const [contactLoading, setContactLoading] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
+  const [ownerId, setOwnerId] = useState<string | null>(null);
+  const [reportChecking, setReportChecking] = useState(false);
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [sentOk, setSentOk] = useState(false);
@@ -410,38 +402,63 @@ export function PrincipalModal({
           <Button
             variant="solid"
             size="md"
-            onClick={() => {
-              if (isOwner) {
-                alert('Esta es tu publicación');
-                return;
+            onClick={async () => {
+              setContactLoading(true);
+              try {
+                const resp = await messagingService.getContactByReport(mascota.id, userId);
+                const oid = resp?.ownerId ?? null;
+                const detectedOwner = Boolean(resp?.isOwner === true || (oid && String(oid).toLowerCase().trim() === String(userId).toLowerCase().trim()));
+
+                setOwnerId(oid);
+                setIsOwner(detectedOwner);
+
+                if (detectedOwner) {
+                  alert('Esta es tu publicación');
+                  setContactOpen(false);
+                } else {
+                  setContactOpen(true);
+                }
+              } catch (err) {
+                console.error('Error obteniendo contacto', err);
+                alert('Error al verificar la propiedad de la publicación');
+              } finally {
+                setContactLoading(false);
               }
-              setContactOpen(true);
             }}
-            disabled={isOwner}
-            title={isOwner ? 'Es tu publicación' : ''}
+            disabled={contactLoading}
           >
-            {isOwner ? 'Mi Publicación' : 'Contactar'}
+            {contactLoading ? 'Cargando...' : 'Contactar'}
           </Button>
 
           <Button
             variant="solid"
             size="md"
-            onClick={() => {
-              if (isOwner) {
-                alert('No puedes reportar tu propia publicación.');
-                return;
-              }
+            onClick={async () => {
               if (alreadyReported) return;
-              onOpenReport?.();
+              setReportChecking(true);
+              try {
+                const resp = await reportService.getContactByReport(mascota.id, userId);
+                const oid = resp?.ownerId ?? null;
+                const detectedOwner = Boolean(resp?.isOwner === true || (oid && String(oid).toLowerCase().trim() === String(userId).toLowerCase().trim()));
+                setOwnerId(oid);
+                setIsOwner(detectedOwner);
+                if (detectedOwner) {
+                  alert('Esta es tu publicación');
+                  return;
+                }
+                onOpenReport?.();
+              } catch (err) {
+                console.error('Error verificando propietario antes de reportar', err);
+                // fallback: open report modal if verification fails
+                onOpenReport?.();
+              } finally {
+                setReportChecking(false);
+              }
             }}
-            style={{
-              backgroundColor: alreadyReported ? '#f87171' : '#dc2626',
-              color: '#ffffff',
-              borderColor: alreadyReported ? '#f87171' : '#dc2626',
-            }}
-            disabled={isOwner}
+            disabled={reportChecking}
+            style={{ backgroundColor: alreadyReported ? '#f87171' : '#dc2626', color: '#ffffff', borderColor: alreadyReported ? '#f87171' : '#dc2626' }}
           >
-            {alreadyReported ? 'Reportado' : 'Reportar'}
+            {reportChecking ? 'Comprobando...' : alreadyReported ? 'Reportado' : 'Reportar'}
           </Button>
 
           <Button variant="ghost" size="md" onClick={onClose}>Cerrar</Button>

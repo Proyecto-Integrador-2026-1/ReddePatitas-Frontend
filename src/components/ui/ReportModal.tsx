@@ -16,13 +16,11 @@ export default function ReportModal({
   onClose,
   publicationId,
   onReported,
-  ownerId,
 }: {
   open: boolean;
   onClose: () => void;
   publicationId: string;
   onReported?: () => void;
-  ownerId?: string;
 }) {
   const { user } = useAuth();
   const userId = String(user?.id || "");
@@ -77,7 +75,7 @@ export default function ReportModal({
         descripcion: descripcionValue,
       };
 
-      const msg = await reportService.submitReportPublication(payload as any, userId, ownerId);
+      const msg = await reportService.submitReportPublication(payload as any, userId);
 
       // mark locally to avoid double reports in UI
       try {
