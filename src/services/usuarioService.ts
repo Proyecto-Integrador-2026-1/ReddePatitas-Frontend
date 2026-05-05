@@ -129,7 +129,17 @@ export async function loginUsuario(emailOrPhone: string, password: string) {
       body: JSON.stringify(body),
     });
 
-    if (!res.ok) { /* manejo de error igual */ }
+    if (!res.ok) {
+      let errorMessage = `Error ${res.status}`;
+      try {
+        const errorBody = await res.json();
+        errorMessage =
+          String(errorBody?.message || errorBody?.error || errorBody?.detail || "").trim() || errorMessage;
+      } catch {
+        // Keep default status message when body is not JSON.
+      }
+      return { ok: false, error: errorMessage };
+    }
 
     const data = await res.json();
     // data tiene: accessToken, refreshToken, tokenType, expiresInSeconds, roles, refreshExpiresInSeconds
