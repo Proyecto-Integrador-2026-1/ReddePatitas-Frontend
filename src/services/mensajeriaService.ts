@@ -33,38 +33,6 @@ export async function getPetContact(petId: string, requesterId: string) {
   return handleRes(res);
 }
 
-// Try contact endpoints by reportId first, then fallback to pet endpoint.
-export async function getContactByReport(reportId: string, requesterId?: string) {
-  const tryUrls = [
-    `${API_BASE}/api/reports/${reportId}/contact`,
-    `${API_BASE}/api/pets/${reportId}/contact`,
-  ];
-  let lastError: any = null;
-  for (const url of tryUrls) {
-    try {
-      const headers: Record<string, string> = { Accept: 'application/json' };
-      if (requesterId) headers['X-User-Id'] = String(requesterId);
-      const res = await fetch(url, { method: 'GET', headers });
-      if (res.status === 404) continue;
-      const body = await handleRes(res);
-      const ownerCandidate =
-        body?.ownerId ||
-        body?.owner?.id ||
-        body?.id ||
-        body?.publicadorId ||
-        body?.publicador?.id ||
-        null;
-      const normalizedOwner = ownerCandidate ? String(ownerCandidate).toLowerCase().trim() : null;
-      const normalizedRequester = requesterId ? String(requesterId).toLowerCase().trim() : null;
-      const isOwner = Boolean(normalizedOwner && normalizedRequester && normalizedOwner === normalizedRequester);
-      return { raw: body ?? null, ownerId: normalizedOwner, isOwner };
-    } catch (err) {
-      lastError = err;
-    }
-  }
-  if (lastError) throw lastError;
-  return { raw: null, ownerId: null, isOwner: false };
-}
 
 export async function sendMessage(
   dto: { reportId?: string | null; conversacionId?: string | null; contenido: string },
@@ -128,8 +96,6 @@ export async function markConversationAsRead(conversationId: string, requesterId
 }
 
 export default {
-  getPetContact,
-  getContactByReport,
   sendMessage,
   listConversations,
   getConversationMessages,
