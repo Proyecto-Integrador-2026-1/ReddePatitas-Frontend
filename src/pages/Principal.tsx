@@ -292,13 +292,12 @@ export function PrincipalModal({
   const { user } = useAuth();
   const userId = String(user?.id || "");
   const [contactOpen, setContactOpen] = useState(false);
-  const [contactLoading, setContactLoading] = useState(false);
-  const [isOwner, setIsOwner] = useState(false);
-  const [ownerId, setOwnerId] = useState<string | null>(null);
-  const [reportChecking, setReportChecking] = useState(false);
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [sentOk, setSentOk] = useState(false);
+  // compute ownership from mascota data directly
+  const ownerIdFromMascota = mascota?.userid ?? mascota?.userid ?? null;
+  const isOwner = Boolean(ownerIdFromMascota && String(ownerIdFromMascota).toLowerCase().trim() === String(userId).toLowerCase().trim());
   const reportedKey = `rdp_reported_${userId}`;
   const alreadyReported = (() => {
     try {
@@ -405,63 +404,34 @@ export function PrincipalModal({
           <Button
             variant="solid"
             size="md"
-            onClick={async () => {
-              setContactLoading(true);
-              try {
-                const resp = await messagingService.getContactByReport(mascota.id, userId);
-                const oid = resp?.ownerId ?? null;
-                const detectedOwner = Boolean(resp?.isOwner === true || (oid && String(oid).toLowerCase().trim() === String(userId).toLowerCase().trim()));
-
-                setOwnerId(oid);
-                setIsOwner(detectedOwner);
-
-                if (detectedOwner) {
-                  alert('Esta es tu publicación');
-                  setContactOpen(false);
-                } else {
-                  setContactOpen(true);
-                }
-              } catch (err) {
-                console.error('Error obteniendo contacto', err);
-                alert('Error al verificar la propiedad de la publicación');
-              } finally {
-                setContactLoading(false);
+            onClick={() => {
+              // ownership determined from mascota.userid; open contact modal if not owner
+              if (isOwner) {
+                alert('Esta es tu publicación');
+                setContactOpen(false);
+              } else {
+                setContactOpen(true);
               }
             }}
-            disabled={contactLoading}
           >
-            {contactLoading ? 'Cargando...' : 'Contactar'}
+            Contactar
           </Button>
 
           <Button
             variant="solid"
             size="md"
-            onClick={async () => {
+            onClick={() => {
               if (alreadyReported) return;
-              setReportChecking(true);
-              try {
-                const resp = await reportService.getContactByReport(mascota.id, userId);
-                const oid = resp?.ownerId ?? null;
-                const detectedOwner = Boolean(resp?.isOwner === true || (oid && String(oid).toLowerCase().trim() === String(userId).toLowerCase().trim()));
-                setOwnerId(oid);
-                setIsOwner(detectedOwner);
-                if (detectedOwner) {
-                  alert('Esta es tu publicación');
-                  return;
-                }
-                onOpenReport?.();
-              } catch (err) {
-                console.error('Error verificando propietario antes de reportar', err);
-                // fallback: open report modal if verification fails
-                onOpenReport?.();
-              } finally {
-                setReportChecking(false);
+              if (isOwner) {
+                alert('Esta es tu publicación');
+                return;
               }
+              onOpenReport?.();
             }}
-            disabled={reportChecking}
             style={{ backgroundColor: alreadyReported ? '#f87171' : '#dc2626', color: '#ffffff', borderColor: alreadyReported ? '#f87171' : '#dc2626' }}
+            disabled={alreadyReported}
           >
-            {reportChecking ? 'Comprobando...' : alreadyReported ? 'Reportado' : 'Reportar'}
+            {alreadyReported ? 'Reportado' : 'Reportar'}
           </Button>
 
           <Button variant="ghost" size="md" onClick={onClose}>Cerrar</Button>

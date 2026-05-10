@@ -82,43 +82,31 @@ export default function MessagesPage() {
           let thumbnail = normalizeImage(rawThumb);
           if (!rawThumb || thumbnail === assets.max) thumbnail = assets.max;
 
-          const otherPerson =
-            (c.participants &&
-              Array.isArray(c.participants) &&
-              c.participants.find((p: any) => String(p.id) !== String(userId))) ||
-            c.publisher ||
-            c.publicador ||
-            c.owner ||
-            c.report?.usuario ||
+          // determine owner/publisher ids and pet/report id
+          const rawOwner =
+            c.ownerId ??
+            (c.owner && (c.owner.id ?? c.owner)) ??
+            c.publicadorId ??
+            (c.publicador && (c.publicador.id ?? c.publicador)) ??
+            c.publisherId ??
+            (c.publisher && (c.publisher.id ?? c.publisher)) ??
+            c.usuarioId ??
+            c.userId ??
             null;
-
-          const publisherName =
-            otherPerson?.nombre ||
-            otherPerson?.nombreCompleto ||
-            otherPerson?.fullName ||
-            otherPerson?.displayName ||
-            otherPerson?.username ||
-            otherPerson?.userName ||
-            c.nombrePublicador ||
-            c.publisherName ||
-            '';
-
-          const publisherId =
-            otherPerson?.id || c.publisherId || c.ownerId || c.publicadorId || '';
+          const ownerIdStr = rawOwner != null ? String(rawOwner) : null;
+          const rawUser2 = c.userId2 || c.user2 || null;
+          const user2Str = rawUser2 ? String(rawUser2) : null;
+          const normalizedOwner = ownerIdStr ? String(ownerIdStr).toLowerCase().trim() : null;
+          const normalizedUser = user?.id ? String(user.id).toLowerCase().trim() : null;
+          const publisherId = (normalizedOwner && normalizedUser && normalizedOwner === normalizedUser && user2Str) ? user2Str : (ownerIdStr || c.publisherId || c.publicadorId || '');
+          const publisherName = c.publisher?.displayName || c.publisherName || '';
+          const petId = reportCandidateId || c.petId || c.mascotaId || c.reportId || (c.report && c.report.id) || null;
 
           const lastMessage = c.lastMessage || c.ultimoMensaje || c.last || null;
+          const unreadCount = Number(c.unreadCount ?? c.unread ?? 0);
 
-          return {
-            ...c,
-            id: String(id),
-            mascotaName,
-            thumbnail,
-            publisherId,
-            publisherName,
-            lastMessage,
-          };
+          return { ...c, id: String(id), mascotaName, thumbnail, publisherId, publisherName, lastMessage, unreadCount, reportId: reportCandidateId, ownerId: ownerIdStr, petId };
         });
-
         setConversations(norm);
 
         (async () => {
@@ -169,38 +157,6 @@ export default function MessagesPage() {
         })();
 
         (async () => {
-          try {
-            const toEnrich = norm
-              .filter((c: any) => (!c.publisherName || c.publisherName.length === 0) && (c.report?.id || c.reportId))
-              .slice(0, 12);
-            if (toEnrich.length === 0) return;
-            const results = await Promise.allSettled(
-              toEnrich.map((c: any) =>
-                messagingService.getContactByReport(c.report?.id || c.reportId, userId)
-              )
-            );
-            results.forEach((r, i) => {
-              if (r.status !== 'fulfilled' || !(r as any).value) return;
-              const body = (r as any).value.raw ?? (r as any).value;
-              if (!body) return;
-              const owner = body.owner || body.publicador || body.user || body.usuario || body.contact || null;
-              let name = null;
-              if (owner) name = owner.nombre || owner.fullName || owner.displayName || owner.username || owner.userName || owner.nombreCompleto || null;
-              if (!name) name = body.ownerName || body.contactName || body.nombrePublicador || null;
-              if (name) {
-                const convId = String(toEnrich[i].id);
-                setConversations((prev) =>
-                  prev.map((p: any) => (String(p.id) === convId ? { ...p, publisherName: name } : p))
-                );
-                if (selectedConv?.id === convId) {
-                  setSelectedConv((s: any) => (s ? { ...s, publisherName: name } : s));
-                }
-              }
-            });
-          } catch (e) {}
-        })();
-
-        (async () => {
           for (const conv of norm) {
             const petCandidates = [
               conv.mascota?.id,
@@ -233,7 +189,7 @@ export default function MessagesPage() {
 
               for (const pid of petCandidates) {
                 try {
-                  const r = await fetch(`${API_BASE}/api/pets/${pid}`);
+                  const r = await fetch(`${API_BASE}/api/reports/${pid}`);
                   if (!r.ok) continue;
                   const body = await r.json().catch(() => null);
                   const petName = body?.nombre || body?.mascota?.nombre || body?.pet?.nombre || null;
@@ -264,7 +220,9 @@ export default function MessagesPage() {
                 if (selectedConv?.id === conv.id) setSelectedConv((s: any) => (s ? { ...s, publisherName: fromOther } : s));
               } else {
                 const pid = conv.publisherId || conv.ownerId || conv.publicadorId || (other && other.id) || null;
-                if (pid && String(pid) === String(user?.id)) {
+                const normPid = pid ? String(pid).toLowerCase().trim() : null;
+                const normUser = user?.id ? String(user.id).toLowerCase().trim() : null;
+                if (pid && normPid && normUser && normPid === normUser) {
                   const selfName = user?.username || (user as any)?.nombre || null;
                   if (selfName) {
                     setConversations((prev) => prev.map((p: any) => (p.id === conv.id ? { ...p, publisherName: selfName } : p)));
@@ -354,8 +312,20 @@ export default function MessagesPage() {
     const otherPerson = conv.publisher || conv.publicador || conv.owner || conv.usuario || conv.report?.usuario || conv.report?.user || null;
     if (otherPerson) return otherPerson.nombre || otherPerson.nombreCompleto || otherPerson.fullName || otherPerson.displayName || otherPerson.username || otherPerson.userName || 'Usuario Desconocido';
 
-    const pid = conv.publisherId || conv.ownerId || conv.publicadorId || (conv.participants && Array.isArray(conv.participants) && conv.participants[0]?.id) || null;
-    if (pid && String(pid) === String(user?.id)) return user?.username || (user as any)?.nombre || 'Yo';
+    const pid =
+      conv.publisherId ??
+      conv.publisher?.id ??
+      conv.ownerId ??
+      conv.owner?.id ??
+      conv.publicadorId ??
+      conv.publicador?.id ??
+      conv.usuarioId ??
+      conv.userId ??
+      (conv.participants && Array.isArray(conv.participants) && conv.participants[0]?.id) ??
+      null;
+    const normPid = pid ? String(pid).toLowerCase().trim() : null;
+    const normUser = user?.id ? String(user.id).toLowerCase().trim() : null;
+    if (pid && normPid && normUser && normPid === normUser) return user?.username || (user as any)?.nombre || 'Yo';
 
     return 'Nombre no disponible';
   };
