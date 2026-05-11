@@ -23,7 +23,7 @@ const sizeStyles: Record<NonNullable<"default" | "sm" | "lg">, string> = {
   lg: "h-16 rounded-[16px] px-8 text-lg font-bold",
 };
 
-export function Button({ variant = "solid", size = "md", className = "", ...props }: ButtonProps) {
+export function Button({ variant = "solid", size = "md", className = "", type = "button", ...props }: ButtonProps) {
   // map our legacy API to the new style keys
   const mapVariant = variant === "solid" ? "default" : (variant === "link" ? "link" : variant);
   const mapSize = size === "md" ? "default" : size;
@@ -31,6 +31,6 @@ export function Button({ variant = "solid", size = "md", className = "", ...prop
   const v = mapVariant as "default" | "outline" | "ghost" | "link";
   const s = mapSize as "default" | "sm" | "lg";
   return (
-    <button className={cn("inline-flex items-center justify-center transition", variantStyles[v], sizeStyles[s], className)} {...props} />
+    <button type={type} className={cn("inline-flex items-center justify-center transition", variantStyles[v], sizeStyles[s], className)} {...props} />
   );
 }

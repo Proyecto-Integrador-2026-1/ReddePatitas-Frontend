@@ -6,7 +6,10 @@ export type InputProps = React.InputHTMLAttributes<HTMLInputElement> & {
   rightIcon?: React.ReactNode;
 };
 
-export function Input({ icon, rightIcon, className = "", ...props }: InputProps) {
+export const Input = React.forwardRef<HTMLInputElement, InputProps>(function Input(
+  { icon, rightIcon, className = "", ...props },
+  ref
+) {
   return (
     <div className="relative">
       {icon && (
@@ -15,6 +18,7 @@ export function Input({ icon, rightIcon, className = "", ...props }: InputProps)
         </div>
       )}
       <input
+        ref={ref}
         className={cn(
           "w-full rounded-[12px] border border-[#eaddcf] bg-[#f9f5f0]/60 px-4 py-3 text-sm text-[#020826] placeholder:text-[#b7a888] focus:border-[#8c7851] focus:outline-none focus:ring-2 focus:ring-[#f6f1e7]",
           icon ? "pl-12" : "",
@@ -30,4 +34,4 @@ export function Input({ icon, rightIcon, className = "", ...props }: InputProps)
       )}
     </div>
   );
-}
+});

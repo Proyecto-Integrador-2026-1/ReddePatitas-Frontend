@@ -24,14 +24,20 @@ function AuthButton() {
     if (user) {
       await logout();
       navigate('/');
-    } else {
-      navigate('/login');
     }
   };
 
+  if (!user) {
+    return (
+      <Link to="/login" className="inline-flex h-14 w-full items-center justify-center rounded-[12px] border border-transparent bg-[#020826] px-6 text-base font-bold text-white shadow-[0px_10px_25px_rgba(0,0,0,0.25)] transition hover:bg-[#020826cc]">
+        Acceder
+      </Link>
+    );
+  }
+
   return (
-    <Button variant="solid" size="md" className="w-full" onClick={handleClick}>
-      {user ? 'Cerrar sesión' : 'Acceder'}
+    <Button variant="solid" size="md" className="w-full" onClick={handleClick} type="button">
+      Cerrar sesión
     </Button>
   );
 }

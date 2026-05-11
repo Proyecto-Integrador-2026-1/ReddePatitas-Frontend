@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useNavigate } from "react-router-dom";
 import { Badge, Button, Card, Input, Label } from "@/components/ui";
 import Modal from "@/components/ui/Modal";
 import { registerUsuario } from "@/services/usuarioService";
@@ -77,6 +78,7 @@ const schema = z
   });
 
 export function Registro() {
+  const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMessage, setModalMessage] = useState("");
@@ -341,10 +343,10 @@ export function Registro() {
                   <p>Términos</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button type="button" onClick={() => window.location.assign("/")} className="text-sm text-[#716040]">
+                  <button type="button" onClick={() => navigate("/")} className="text-sm text-[#716040]">
                     Volver a Principal
                   </button>
-                  <button type="button" onClick={() => window.location.assign("/login")} className="text-sm font-semibold text-[#020826]">
+                  <button type="button" onClick={() => navigate("/login")} className="text-sm font-semibold text-[#020826]">
                     ¿Ya tienes cuenta? Acceder
                   </button>
                 </div>
