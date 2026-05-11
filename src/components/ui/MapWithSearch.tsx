@@ -20,6 +20,15 @@ const getThumbnail = (m: Mascota): string =>
 const getOriginal = (m: Mascota): string =>
   m.imagen_url ? normalizeImage(m.imagen_url) : "";
 
+// Función para determinar el color del borde según el estado
+const getBorderColor = (estado?: string): string => {
+  if (!estado) return "border-gray-400";
+  const estadoLower = estado.toLowerCase();
+  if (estadoLower.includes("perd")) return "border-red-500";
+  if (estadoLower.includes("encont")) return "border-green-500";
+  return "border-gray-400";
+};
+
 export default function MapWithSearch({
   mascotas = [],
   onVisibleChange,
@@ -137,11 +146,12 @@ export default function MapWithSearch({
               const thumbnailSrc = getThumbnail(m);
               const originalSrc = getOriginal(m);
               const markerSrc = thumbnailSrc || originalSrc || assets.max;
+              const borderColor = getBorderColor(m.estado);
 
               return (
               <MapMarker key={m.id} longitude={lng} latitude={lat}>
                 <MarkerContent>
-                  <div className="size-6 rounded-full overflow-hidden border-2 border-white shadow-lg cursor-pointer hover:scale-110 transition-transform">
+                  <div className={`size-6 rounded-full overflow-hidden border-2 ${borderColor} shadow-lg cursor-pointer hover:scale-110 transition-transform`}>
                     <img
                       key={`marker-${m.id}-${thumbnailSrc}`}
                       src={markerSrc}

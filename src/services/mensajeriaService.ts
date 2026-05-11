@@ -35,7 +35,7 @@ export async function getPetContact(petId: string, requesterId: string) {
 
 
 export async function sendMessage(
-  dto: { reportId?: string | null; conversacionId?: string | null; contenido: string },
+  dto: { reportId: string; receiverId: string; content: string },
   senderId: string
 ) {
   if (!senderId) throw new Error('missing_user_id');
@@ -63,8 +63,9 @@ export async function listConversations(requesterId: string) {
     },
   });
   const body = await handleRes(res);
+  const conversations = Array.isArray(body) ? body : body?.conversations ?? [];
   return {
-    conversations: body?.conversations ?? [],
+    conversations,
     totalUnread: body?.totalUnread ?? 0,
   };
 }
@@ -95,9 +96,25 @@ export async function markConversationAsRead(conversationId: string, requesterId
   return handleRes(res);
 }
 
+export async function deleteConversation(conversationId: string, requesterId: string) {
+  if (!requesterId) throw new Error('missing_user_id');
+  if (!conversationId) throw new Error('missing_conversation_id');
+  
+  const url = `${API_BASE}/api/conversations/${conversationId}`;
+  const res = await fetch(url, {
+    method: 'DELETE',
+    headers: {
+      'X-User-Id': String(requesterId),
+      Accept: 'application/json',
+    },
+  });
+  return handleRes(res);
+}
+
 export default {
   sendMessage,
   listConversations,
   getConversationMessages,
   markConversationAsRead,
+  deleteConversation,
 };

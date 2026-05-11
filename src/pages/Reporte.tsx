@@ -502,10 +502,10 @@ export function Reportar() {
 
           <div className="mt-6 flex flex-col items-center gap-3">
             <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4">
-              <button type="button" onClick={() => window.location.assign("/")} className="text-sm text-[#716040]">
+              <button type="button" onClick={() => navigate("/")} className="text-sm text-[#716040]">
                 Volver a Principal
               </button>
-              <button type="button" onClick={() => window.location.assign("/registro")} className="text-sm font-semibold text-[#020826]">
+              <button type="button" onClick={() => navigate("/registro")} className="text-sm font-semibold text-[#020826]">
                 ¿No tienes cuenta? Regístrate
               </button>
             </div>

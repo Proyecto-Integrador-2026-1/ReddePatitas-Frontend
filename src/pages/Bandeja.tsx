@@ -50,11 +50,15 @@ export default function MessagesPage() {
         const norm = rawConvs.map((c: any) => {
           const id =
             c.id ||
-            c.conversacionId ||
+            c.userConversationId ||
+            c.user_conversation_id ||
+            c.userConversation?.id ||
+            '';
+
+          const conversationId =
             c.conversationId ||
+            c.conversacionId ||
             c.conversation?.id ||
-            c.reportId ||
-            c.report?.id ||
             '';
 
           const reportCandidateId = c.report?.id || c.reportId || null;
@@ -84,6 +88,7 @@ export default function MessagesPage() {
 
           // determine owner/publisher ids and pet/report id
           const rawOwner =
+            c.otherUserId ??
             c.ownerId ??
             (c.owner && (c.owner.id ?? c.owner)) ??
             c.publicadorId ??
@@ -98,14 +103,29 @@ export default function MessagesPage() {
           const user2Str = rawUser2 ? String(rawUser2) : null;
           const normalizedOwner = ownerIdStr ? String(ownerIdStr).toLowerCase().trim() : null;
           const normalizedUser = user?.id ? String(user.id).toLowerCase().trim() : null;
-          const publisherId = (normalizedOwner && normalizedUser && normalizedOwner === normalizedUser && user2Str) ? user2Str : (ownerIdStr || c.publisherId || c.publicadorId || '');
-          const publisherName = c.publisher?.displayName || c.publisherName || '';
+          const publisherId = (normalizedOwner && normalizedUser && normalizedOwner === normalizedUser && user2Str)
+            ? user2Str
+            : (ownerIdStr || c.publisherId || c.publicadorId || c.otherUserId || '');
+          const publisherName = c.otherUserName || c.publisher?.displayName || c.publisherName || '';
           const petId = reportCandidateId || c.petId || c.mascotaId || c.reportId || (c.report && c.report.id) || null;
 
           const lastMessage = c.lastMessage || c.ultimoMensaje || c.last || null;
           const unreadCount = Number(c.unreadCount ?? c.unread ?? 0);
 
-          return { ...c, id: String(id), mascotaName, thumbnail, publisherId, publisherName, lastMessage, unreadCount, reportId: reportCandidateId, ownerId: ownerIdStr, petId };
+          return {
+            ...c,
+            id: String(id),
+            conversationId: String(conversationId || ''),
+            mascotaName,
+            thumbnail,
+            publisherId,
+            publisherName,
+            lastMessage,
+            unreadCount,
+            reportId: reportCandidateId,
+            ownerId: ownerIdStr,
+            petId,
+          };
         });
         setConversations(norm);
 
@@ -288,7 +308,14 @@ export default function MessagesPage() {
   const send = async () => {
     if (!texto.trim() || !userId) return;
     try {
-      const dto = { reportId: null, conversacionId: selectedConv?.id ?? null, contenido: texto };
+      const receiverId =
+        selectedConv?.otherUserId ||
+        selectedConv?.publisherId ||
+        selectedConv?.ownerId ||
+        selectedConv?.userId2 ||
+        '';
+      const reportId = selectedConv?.reportId || selectedConv?.report?.id || '';
+      const dto = { reportId, receiverId, content: texto };
       await messagingService.sendMessage(dto, userId);
       setTexto('');
       const msgs = await messagingService.getConversationMessages(selectedConv.id, userId);
@@ -330,7 +357,7 @@ export default function MessagesPage() {
     return 'Nombre no disponible';
   };
 
-  return (
+    return (
     <div className="min-h-screen bg-[#f5f1ea] p-4 sm:p-6">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-4">
         <div className="flex items-center justify-between">
@@ -361,27 +388,54 @@ export default function MessagesPage() {
                   const name = getDisplayNameForConv(conv);
                   const badge = typeof conv.unreadCount === 'number' ? conv.unreadCount : 0;
                   return (
-                    <button
-                      key={conv.id}
-                      type="button"
-                      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition ${
-                        isActive ? 'bg-[#f9f4ef] shadow-[0px_4px_8px_rgba(0,0,0,0.08)]' : 'hover:bg-[#f6f1e7]'
-                      }`}
-                      onClick={() => selectConv(conv)}
-                    >
-                      <Avatar src={conv.thumbnail} fallback={name?.[0] || 'U'} />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between">
-                          <span className="truncate text-sm font-semibold text-[#020826]">{name}</span>
-                          {badge > 0 && (
-                            <Badge className="bg-[#8c7851] text-white">{badge}</Badge>
-                          )}
+                    <div key={conv.id} className="group relative">
+                      <button
+                        type="button"
+                        className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition ${
+                          isActive ? 'bg-[#f9f4ef] shadow-[0px_4px_8px_rgba(0,0,0,0.08)]' : 'hover:bg-[#f6f1e7]'
+                        }`}
+                        onClick={() => selectConv(conv)}
+                      >
+                        <Avatar src={conv.thumbnail} fallback={name?.[0] || 'U'} />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between">
+                            <span className="truncate text-sm font-semibold text-[#020826]">{name}</span>
+                            {badge > 0 && (
+                              <Badge className="bg-[#8c7851] text-white">{badge}</Badge>
+                            )}
+                          </div>
+                          <div className="truncate text-xs text-[#716040]">
+                            {conv.mascotaName || 'Mascota sin nombre'}
+                          </div>
                         </div>
-                        <div className="truncate text-xs text-[#716040]">
-                          {conv.mascotaName || 'Mascota sin nombre'}
-                        </div>
-                      </div>
-                    </button>
+                      </button>
+
+                      {/* Botón eliminar - aparece al hacer hover */}
+                      <button
+                        type="button"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1.5 rounded-full hover:bg-red-100 transition-all duration-200"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          if (confirm(`¿Eliminar conversación con ${name}? Esta acción no se puede deshacer.`)) {
+                            try {
+                              await messagingService.deleteConversation(conv.id, userId);
+                              setConversations(prev => prev.filter(c => c.id !== conv.id));
+                              if (selectedConv?.id === conv.id) {
+                                setSelectedConv(null);
+                                setMessages([]);
+                              }
+                            } catch (err) {
+                              console.error('Error eliminando conversación:', err);
+                              alert('No se pudo eliminar la conversación');
+                            }
+                          }
+                        }}
+                      >
+                        <svg className="w-4 h-4 text-red-500 hover:text-red-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
                   );
                 })
               )}
@@ -418,7 +472,7 @@ export default function MessagesPage() {
                                 : 'bg-[#f9f4ef] text-[#020826]'
                             }`}
                           >
-                            {msg.contenido || msg.texto || msg.body || ''}
+                            {msg.content || msg.contenido || msg.texto || msg.body || ''}
                           </div>
                         </div>
                       );

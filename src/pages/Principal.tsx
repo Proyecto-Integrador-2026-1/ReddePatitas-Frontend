@@ -1,10 +1,11 @@
-import React, { useEffect, useRef, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, Link, useSearchParams } from "react-router-dom"; // 👈 Añadir useSearchParams
 // map primitives are used inside MapWithSearch
 import { Star, Navigation, Clock, ExternalLink } from "lucide-react";
 import { Avatar, Chip, PetCard, Pet, SideNav, Button, Badge, Card } from "../components/ui";
 import ReportModal from "../components/ui/ReportModal";
 import MapWithSearch from "../components/ui/MapWithSearch";
+import { MapFilters } from "../components/ui/MapFilters"; // 👈 Importar el componente de filtros
 import { assets, normalizeImage } from "@/lib/imageUtils";
 import Modal from "../components/ui/Modal";
 import type { Mascota } from "../types/mascota";
@@ -93,6 +94,7 @@ const navItems = [
 
 // MyMap moved to src/components/ui/MapWithSearch.tsx
 
+
 const formatShortDate = (value?: string) => {
   if (!value) return "";
   const parsed = new Date(value);
@@ -109,11 +111,75 @@ export function Principal() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [mascotas, setMascotas] = useState<Mascota[]>([]);
+  const [searchParams, setSearchParams] = useSearchParams(); 
   const [visibleMascotas, setVisibleMascotas] = useState<Mascota[]>([]);
   const [selectedMascota, setSelectedMascota] = useState<Mascota | null>(null);
   const [totalUnread, setTotalUnread] = useState<number>(0);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportedVersion, setReportedVersion] = useState(0);
+
+
+    // Estado para los filtros
+  const [filters, setFilters] = useState({
+    estado: 'todos' as 'todos' | 'perdido' | 'encontrado',
+    tipo: 'todos' as 'todos' | 'perro' | 'gato' | 'otro',
+  });
+
+  // Cargar filtros desde URL al iniciar
+  useEffect(() => {
+    const estado = searchParams.get('estado') as 'todos' | 'perdido' | 'encontrado' | null;
+    const tipo = searchParams.get('tipo') as 'todos' | 'perro' | 'gato' | 'otro' | null;
+    setFilters({
+      estado: estado || 'todos',
+      tipo: tipo || 'todos',
+    });
+  }, []);
+
+  // Función para aplicar filtros a las mascotas
+  const getFilteredMascotas = () => {
+    return mascotas.filter((m) => {
+      // Filtro por estado
+      if (filters.estado !== 'todos') {
+        const estadoMascota = (m.estado || '').toLowerCase();
+        const filtroEstado = filters.estado.toLowerCase();
+        if (!estadoMascota.includes(filtroEstado)) return false;
+      }
+
+      // Filtro por tipo
+      if (filters.tipo !== 'todos') {
+        const tipoMascota = (m.tipo || '').toLowerCase();
+        const filtroTipo = filters.tipo.toLowerCase();
+        if (tipoMascota !== filtroTipo) return false;
+      }
+
+      return true;
+    });
+  };
+
+  // Función para actualizar un filtro
+  const handleFilterChange = (key: string, value: string) => {
+    const newFilters = { ...filters, [key]: value };
+    setFilters(newFilters);
+    // Actualizar URL
+    setSearchParams({
+      ...(newFilters.estado !== 'todos' && { estado: newFilters.estado }),
+      ...(newFilters.tipo !== 'todos' && { tipo: newFilters.tipo }),
+    });
+  };
+
+  // Función para limpiar todos los filtros
+  const handleClearFilters = () => {
+    setFilters({ estado: 'todos', tipo: 'todos' });
+    setSearchParams({}); // Limpiar URL
+  };
+
+  // Verificar si hay filtros activos
+  const hasActiveFilters = filters.estado !== 'todos' || filters.tipo !== 'todos';
+
+  // Obtener mascotas filtradas
+  const filteredMascotas = useMemo(() => getFilteredMascotas(), [mascotas, filters.estado, filters.tipo]);
+
+
 
   useEffect(() => {
     let mounted = true;
@@ -182,19 +248,11 @@ export function Principal() {
 
   return (
     <div className="min-h-screen bg-[#f5f1ea] text-[#020826]">
-      {/*
-        Layout wrapper: columna en móviles y fila en pantallas grandes (lg).
-        - flex-col en móviles para apilar aside / mapa / panel derecho.
-        - lg:flex-row para layout de dos columnas en desktop.
-      */}
       <div className="mx-auto flex flex-col lg:flex-row w-full max-w-full gap-6 px-4 md:px-6 py-6">
-        {/*
-          Aside (navegación): oculto en pantallas pequeñas para ahorrar espacio.
-          Se muestra en `lg` (desktop) con ancho fijo.
-        */}
+        {/* Aside (navegación) */}
         <aside className="hidden lg:flex lg:flex-col lg:min-h-screen w-64 rounded-3xl border border-[#e5e7eb] bg-white/90 p-6 shadow-[0px_25px_50px_rgba(0,0,0,0.1)]">
           <div className="mb-5 flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#020826] text-white" aria-hidden="false" aria-label="Logo Red de Patitas">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#020826] text-white">
               <img src="/assets/huellas.svg" alt="Red de Patitas" className="h-6 w-6" />
             </div>
             <p className="text-xl font-bold">Red de Patitas</p>
@@ -202,20 +260,35 @@ export function Principal() {
           <SideNav items={navItems.map((it) => (it.label === 'Mensajes' ? { ...it, count: totalUnread } : it))} />
         </aside>
 
-        {/*
-          Contenido principal para escritorio: se divide en dos columnas dentro del área central
-          - Columna izquierda (lista):.
-          - Columna derecha (mapa):contiene marcadores y panel derecho.
-        */}
+        {/* Contenido principal */}
         <div className="flex-1 flex flex-col rounded-3xl border border-[#e5e7eb] bg-[#f9f4ef]">
-          {/* Top bar removed (search moved into map). */}
+          {/* 👇 FILTROS - ubicados arriba del mapa */}
+          <div className="px-4 md:px-6 pt-4">
+            <MapFilters
+              filters={filters}
+              onFilterChange={handleFilterChange}
+              onClearFilters={handleClearFilters}
+            />
+          </div>
 
           {/* Área de contenido: lista a la izquierda y mapa a la derecha */}
           <div className="flex-1 flex gap-6 px-4 md:px-6 pb-6">
             {/* Lista de reportes (desktop) */}
             <div className="hidden lg:flex w-auto max-w-[360px] flex-col">
-              <div className="mb-4 mt-6 flex items-center justify-between px-16">
-                <h3 className="text-lg font-bold">Mascotas en la zona</h3>
+              <div className="mb-4 mt-6 flex items-center justify-between px-4">
+                <h3 className="text-lg font-bold">
+                  Mascotas en la zona
+                  {hasActiveFilters && (
+                    <span className="ml-2 text-xs font-normal text-muted-foreground">
+                      (filtros aplicados)
+                    </span>
+                  )}
+                </h3>
+                {hasActiveFilters && (
+                  <Button variant="ghost" size="sm" onClick={handleClearFilters}>
+                    Limpiar filtros
+                  </Button>
+                )}
               </div>
               <div className="space-y-2 overflow-y-auto max-h-[calc(100vh-80px)] pr-2">
                 {visibleMascotas.length > 0 ? (
@@ -238,22 +311,25 @@ export function Principal() {
                     );
                   })
                 ) : (
-                  <div className="p-4 text-center text-sm text-muted-foreground">No hay mascotas en esta zona</div>
+                  <div className="p-4 text-center text-sm text-muted-foreground">
+                    {hasActiveFilters ? "No hay mascotas con estos filtros" : "No hay mascotas en esta zona"}
+                  </div>
                 )}
               </div>
             </div>
 
-            {/* Mapa*/}
-                <div className="relative flex-1 overflow-visible rounded-2xl">
-                  <MapWithSearch
-                    mascotas={mascotas}
-                    onVisibleChange={setVisibleMascotas}
-                    onSelectMascota={setSelectedMascota}
-                  />
-                </div>
+            {/* Mapa - con mascotas filtradas */}
+            <div className="relative flex-1 overflow-visible rounded-2xl">
+              <MapWithSearch
+                mascotas={filteredMascotas}  // 👈 Usamos mascotas filtradas
+                onVisibleChange={setVisibleMascotas}
+                onSelectMascota={setSelectedMascota}
+              />
+            </div>
           </div>
         </div>
       </div>
+      
       <PrincipalModal
         mascota={selectedMascota}
         onClose={() => setSelectedMascota(null)}
@@ -377,7 +453,11 @@ export function PrincipalModal({
                       if (!message.trim()) return;
                       setSending(true);
                       try {
-                        const dto = { reportId: mascota.id, conversacionId: null, contenido: message };
+                        const dto = {
+                          reportId: mascota.id,
+                          receiverId: String(ownerIdFromMascota || ""),
+                          content: message,
+                        };
                         await messagingService.sendMessage(dto, userId);
                         setSentOk(true);
                         setMessage('');
