@@ -7,6 +7,8 @@ import Reporte from "./pages/Reporte";
 import Perfil from "./pages/Perfil";
 import { Navigate } from "react-router-dom";
 import Bandeja from "./pages/Bandeja";
+import CasosExitosos from "./pages/CasosExitosos";
+import Dashboard from "./pages/Dashboard";
 
 function App() {
   return (
@@ -18,7 +20,9 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/reporte" element={<Reporte />} />
         <Route path="/perfil" element={<Perfil />} />
+        <Route path="/casos-exitosos" element={<CasosExitosos />} />
         <Route path="/conversations" element={<Bandeja />} />
+        <Route path="/dashboard" element={<Dashboard/>} />
       </Routes>
     </BrowserRouter>
   );
