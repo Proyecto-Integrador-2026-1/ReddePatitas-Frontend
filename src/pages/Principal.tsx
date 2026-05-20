@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom"; // 👈 Añadir useSearchParams
 // map primitives are used inside MapWithSearch
 import { Star, Navigation, Clock, ExternalLink } from "lucide-react";
-import { Avatar, Chip, PetCard, Pet, SideNav, Button, Badge, Card } from "../components/ui";
+import { Avatar, Chip, PetCard, Pet, SideNav, Button, Badge, Card, Label } from "../components/ui";
 import ReportModal from "../components/ui/ReportModal";
 import MapWithSearch from "../components/ui/MapWithSearch";
 import { MapFilters } from "../components/ui/MapFilters"; // 👈 Importar el componente de filtros
@@ -14,6 +14,7 @@ import { fetchMascotas } from "../services/principalService";
 import { useAuth } from '../hooks/useAuth';
 import messagingService from '../services/mensajeriaService';
 import reportService from '../services/reportPublicationService';
+import reportsService from '../services/reportsService';
 import { RoleGuard } from '../components/RoleGuard';
 
 // image utils moved to src/lib/imageUtils.ts
@@ -87,6 +88,25 @@ const navItems = [
   //     </svg>
   //   ),
   // },
+  {
+    label: "Casos Exitosos",
+    to: "/casos-exitosos",
+    icon: (
+      <svg className="h-6 w-6 text-[#716040]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
+    label: "Dashboard",
+    to: "/dashboard",
+    authOnly: true,
+    icon: (
+      <svg className="h-5 w-5 text-[#716040]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M3 13h6v8H3zM15 3h6v18h-6z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    )
+  }
 ];
 
 // total unread messages across conversations
@@ -192,7 +212,7 @@ export function Principal() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [reportedVersion]);
 
   // compute total unread messages across conversations (limited to first N to avoid heavy load)
   useEffect(() => {
@@ -335,6 +355,9 @@ export function Principal() {
         onClose={() => setSelectedMascota(null)}
         onOpenReport={() => setReportOpen(true)}
         reportedVersion={reportedVersion}
+        onResolved={() => setReportedVersion((v) => v + 1)}
+        hideContact={Boolean(!user || (selectedMascota && String(selectedMascota.userid).toLowerCase().trim() === String(user?.id).toLowerCase().trim()))}
+        hideReport={Boolean(!user || (selectedMascota && String(selectedMascota.userid).toLowerCase().trim() === String(user?.id).toLowerCase().trim()))}
       />
       <ReportModal
         open={reportOpen}
@@ -356,11 +379,19 @@ export function PrincipalModal({
   onClose,
   onOpenReport,
   reportedVersion,
+  onResolved,
+  hideContact = false,
+  hideReport = false,
+  hideResolve = false,
 }: {
   mascota: Mascota | null;
   onClose: () => void;
   onOpenReport?: () => void;
   reportedVersion?: number;
+  onResolved?: () => void;
+  hideContact?: boolean;
+  hideReport?: boolean;
+  hideResolve?: boolean;
 }) {
   if (!mascota) return null;
 
@@ -391,6 +422,11 @@ export function PrincipalModal({
     const id = setTimeout(() => setSentOk(false), 3000);
     return () => clearTimeout(id);
   }, [sentOk]);
+
+  const [resolveOpen, setResolveOpen] = useState(false);
+  const [reencontrado, setReencontrado] = useState(true);
+  const [resolveMessage, setResolveMessage] = useState("");
+  const [resolving, setResolving] = useState(false);
 
   return (
     <Modal open={!!mascota} onClose={onClose}>
@@ -481,41 +517,102 @@ export function PrincipalModal({
 
         {/* Buttons row: Contactar, Reportar, Cerrar */}
         <div className="flex gap-2 pt-2">
-          <Button
-            variant="solid"
-            size="md"
-            onClick={() => {
-              // ownership determined from mascota.userid; open contact modal if not owner
-              if (isOwner) {
-                alert('Esta es tu publicación');
-                setContactOpen(false);
-              } else {
-                setContactOpen(true);
-              }
-            }}
-          >
-            Contactar
-          </Button>
+          {!hideContact && (
+            <Button
+              variant="solid"
+              size="md"
+              onClick={() => {
+                // ownership determined from mascota.userid; open contact modal if not owner
+                if (isOwner) {
+                  alert('Esta es tu publicación');
+                  setContactOpen(false);
+                } else {
+                  setContactOpen(true);
+                }
+              }}
+            >
+              Contactar
+            </Button>
+          )}
 
-          <Button
-            variant="solid"
-            size="md"
-            onClick={() => {
-              if (alreadyReported) return;
-              if (isOwner) {
-                alert('Esta es tu publicación');
-                return;
-              }
-              onOpenReport?.();
-            }}
-            style={{ backgroundColor: alreadyReported ? '#f87171' : '#dc2626', color: '#ffffff', borderColor: alreadyReported ? '#f87171' : '#dc2626' }}
-            disabled={alreadyReported}
-          >
-            {alreadyReported ? 'Reportado' : 'Reportar'}
-          </Button>
+          {!hideReport && (
+            <Button
+              variant="solid"
+              size="md"
+              onClick={() => {
+                if (alreadyReported) return;
+                if (isOwner) {
+                  alert('Esta es tu publicación');
+                  return;
+                }
+                onOpenReport?.();
+              }}
+              style={{ backgroundColor: alreadyReported ? '#f87171' : '#dc2626', color: '#ffffff', borderColor: alreadyReported ? '#f87171' : '#dc2626' }}
+              disabled={alreadyReported}
+            >
+              {alreadyReported ? 'Reportado' : 'Reportar'}
+            </Button>
+          )}
 
           <Button variant="ghost" size="md" onClick={onClose}>Cerrar</Button>
+
+          {!hideResolve && isOwner ? (
+            <Button
+              variant="solid"
+              size="md"
+              onClick={() => setResolveOpen(true)}
+              className="ml-auto"
+            >
+              Marcar como resuelta
+            </Button>
+          ) : null}
         </div>
+        {/* Resolve modal for owners */}
+        <Modal open={resolveOpen} onClose={() => setResolveOpen(false)}>
+          <div className="space-y-4">
+            <h3 className="text-lg font-bold">Marcar publicación como resuelta</h3>
+            <p className="text-sm text-muted-foreground">¿Se reencontró con su dueño?</p>
+            <div className="flex gap-4 items-center">
+              <label className="flex items-center gap-2">
+                <input type="radio" name="reencontrado" checked={reencontrado === true} onChange={() => setReencontrado(true)} />
+                <span>Sí</span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="radio" name="reencontrado" checked={reencontrado === false} onChange={() => setReencontrado(false)} />
+                <span>No</span>
+              </label>
+            </div>
+            <div>
+              <Label>Mensaje de agradecimiento (opcional)</Label>
+              <textarea className="w-full rounded border p-2" rows={4} value={resolveMessage} onChange={(e) => setResolveMessage(e.target.value)} />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setResolveOpen(false)}>Cancelar</Button>
+              <Button
+                variant="solid"
+                size="sm"
+                onClick={async () => {
+                  setResolving(true);
+                  try {
+                    await reportsService.resolveReport(String(mascota.id), { reencontrado: Boolean(reencontrado), mensaje: resolveMessage || undefined }, String(userId));
+                    alert('Publicación marcada como resuelta');
+                    setResolveOpen(false);
+                    onResolved?.();
+                    onClose();
+                  } catch (err) {
+                    console.error('Error marcando como resuelta', err);
+                    alert('No se pudo marcar como resuelta');
+                  } finally {
+                    setResolving(false);
+                  }
+                }}
+                disabled={resolving}
+              >
+                {resolving ? 'Procesando...' : 'Confirmar'}
+              </Button>
+            </div>
+          </div>
+        </Modal>
       </div>
     </Modal>
   );
