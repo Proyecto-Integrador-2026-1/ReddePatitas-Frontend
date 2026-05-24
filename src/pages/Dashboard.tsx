@@ -31,6 +31,16 @@ export default function Dashboard() {
   const [restoreTarget, setRestoreTarget] = useState<any | null>(null);
   const [restoreMotivo, setRestoreMotivo] = useState('');
   const [restoring, setRestoring] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmType, setConfirmType] = useState<string | null>(null);
+  const [confirmPayload, setConfirmPayload] = useState<any | null>(null);
+  const [confirmMotivo, setConfirmMotivo] = useState('');
+  const [confirmLoading, setConfirmLoading] = useState(false);
+  const [flashMessage, setFlashMessage] = useState<string | null>(null);
+  const [userReported, setUserReported] = useState<any[]>([]);
+  const [userHidden, setUserHidden] = useState<any[]>([]);
+  const [userDeleted, setUserDeleted] = useState<any[]>([]);
+  const [loadingUserStatus, setLoadingUserStatus] = useState(false);
 
   function readMetric(obj: Record<string, any> | null, candidates: string[]) {
     if (!obj) return undefined;
@@ -86,6 +96,105 @@ export default function Dashboard() {
     return () => { mounted = false; };
   }, [isAdmin, user?.id]);
 
+  // load personal reported/hidden/deleted lists for non-admin authenticated users
+  useEffect(() => {
+    let mounted = true;
+    if (!user?.id || isAdmin) return;
+    const uid = String(user.id);
+    setLoadingUserStatus(true);
+    Promise.all([
+      adminService.listReported(uid, 0, 50).catch(() => []),
+      adminService.listHiddenPublications(uid, 0, 50).catch(() => []),
+      adminService.listDeletedPublications(uid, 0, 50).catch(() => []),
+    ]).then(([rep, hid, del]) => {
+      if (!mounted) return;
+      // filter results by ownership for safety
+      const extractOwnerId = (it: any) => String(it.userId ?? it.user_id ?? it.usuarioId ?? it.usuario_id ?? it.publisherId ?? it.publisher_id ?? it.ownerId ?? it.owner_id ?? it.userid ?? it.user ?? '');
+      const makeArray = (x: any) => Array.isArray(x) ? x : [];
+      let repArr = makeArray(rep).filter((r: any) => extractOwnerId(r) === uid || String(r.publisherId ?? r.publisher_id ?? r.usuarioId ?? r.usuario_id ?? '') === uid);
+      let hidArr = makeArray(hid).filter((h: any) => extractOwnerId(h) === uid || String(h.publisherId ?? h.publisher_id ?? h.usuarioId ?? h.usuario_id ?? '') === uid);
+      let delArr = makeArray(del).filter((d: any) => extractOwnerId(d) === uid || String(d.publisherId ?? d.publisher_id ?? d.usuarioId ?? d.usuario_id ?? '') === uid);
+      setUserReported(repArr);
+      setUserHidden(hidArr);
+      setUserDeleted(delArr);
+    }).catch((e) => {
+      if (!mounted) return;
+      setFlashMessage(String(e));
+    }).finally(() => { if (mounted) setLoadingUserStatus(false); });
+    return () => { mounted = false; };
+  }, [user?.id, isAdmin]);
+
+  const renderUserPersonalLists = () => {
+    if (loadingUserStatus) return <div className="text-sm text-muted-foreground mt-3">Cargando estado de mis publicaciones...</div>;
+    return (
+      <>
+        {userReported.length > 0 && (
+          <div className="mt-4">
+            <h4 className="text-md font-semibold mb-2">Mis publicaciones reportadas</h4>
+            <div className="space-y-2">
+              {userReported.map((r: any, idx) => (
+                <Card key={idx} className="p-3">
+                  <div className="flex gap-3 items-start">
+                    <img src={normalizeImage(r.thumbnailUrl ?? r.thumbnail_url ?? r.imagenUrl ?? r.imagen_url ?? '')} alt="mini" className="h-16 w-16 rounded object-cover flex-shrink-0" />
+                    <div className="flex-1">
+                      <div className="text-sm font-medium">{r.petName ?? r.nombre ?? r.name ?? `Publicación ${String(r.petId ?? r.pet_id ?? '')}`}</div>
+                      {r.fechaCreacion && <div className="text-xs text-muted-foreground">{new Date(r.fechaCreacion).toLocaleString()}</div>}
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {userHidden.length > 0 && (
+          <div className="mt-4">
+            <h4 className="text-md font-semibold mb-2">Mis publicaciones ocultas</h4>
+            <div className="space-y-2">
+              {userHidden.map((h: any, idx) => (
+                <Card key={idx} className="p-3">
+                  <div className="flex gap-3 items-start">
+                    <img src={normalizeImage(h.thumbnailUrl ?? h.thumbnail_url ?? h.imagenUrl ?? h.imagen_url ?? h.image ?? '')} alt="mini" className="h-16 w-16 rounded object-cover flex-shrink-0" />
+                    <div className="flex-1">
+                      <div className="text-sm font-medium">{h.petName ?? h.nombre ?? h.name ?? `Publicación ${String(h.petId ?? h.pet_id ?? '')}`}</div>
+                      {h.fechaCreacion && <div className="text-xs text-muted-foreground">{new Date(h.fechaCreacion).toLocaleString()}</div>}
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {userDeleted.length > 0 && (
+          <div className="mt-4">
+            <h4 className="text-md font-semibold mb-2">Mis publicaciones eliminadas</h4>
+            <div className="space-y-2">
+              {userDeleted.map((d: any, idx) => (
+                <Card key={idx} className="p-3">
+                  <div className="flex gap-3 items-start">
+                    <img src={normalizeImage(d.thumbnailUrl ?? d.thumbnail_url ?? d.imagenUrl ?? d.imagen_url ?? d.image ?? '')} alt="mini" className="h-16 w-16 rounded object-cover flex-shrink-0" />
+                    <div className="flex-1">
+                      <div className="text-sm font-medium">{d.petName ?? d.nombre ?? d.name ?? `Publicación ${String(d.petId ?? d.pet_id ?? '')}`}</div>
+                      {d.fechaCreacion && <div className="text-xs text-muted-foreground">{new Date(d.fechaCreacion).toLocaleString()}</div>}
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+      </>
+    );
+  };
+
+  // auto-clear flash messages
+  useEffect(() => {
+    if (!flashMessage) return;
+    const t = setTimeout(() => setFlashMessage(null), 3000);
+    return () => clearTimeout(t);
+  }, [flashMessage]);
+
   const resolvedIds = useMemo(() => new Set(resolved.map(r => r.id)), [resolved]);
 
   const visibleAll = useMemo(() => {
@@ -125,30 +234,40 @@ export default function Dashboard() {
               ? 'Administrador: en esta sección podrás ver todas las publicaciones y generar acciones de auditoría.'
               : 'En esta sección puedes ver tus publicaciones activas y resueltas.'}
           </p>
+          {/* user's personal lists are shown inline below Active publications */}
         </div>
         {isAdmin && (
           <div className="mb-6">
             <h3 className="text-lg font-bold mb-3">Métricas de administración</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-              <div className="p-4 rounded-lg bg-white shadow flex flex-col border border-red-200">
-                <div className="text-sm text-muted-foreground">Publicaciones Reportadas</div>
-                <div className="text-2xl font-bold text-red-600">{loadingMetrics ? '—' : (readMetric(metrics, ['total_Publicaciones_Reportadas','totalPublicacionesReportadas','total_reported','reported_count']) ?? '0')}</div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+              <div className="p-4 rounded-lg bg-white shadow flex flex-col items-center justify-center text-center border border-red-200">
+                <div className="text-sm text-muted-foreground text-center font-bold">Publicaciones Reportadas</div>
+                <div className="text-2xl font-bold text-red-600 text-center">{loadingMetrics ? '—' : (readMetric(metrics, ['total_Publicaciones_Reportadas','totalPublicacionesReportadas','total_reported','reported_count']) ?? '0')}</div>
                 <div className="text-sm text-red-500 mt-2">Requiere atención inmediata</div>
               </div>
-              <div className="p-4 rounded-lg bg-white shadow flex flex-col">
-                <div className="text-sm text-muted-foreground">Total Publicaciones</div>
-                <div className="text-2xl font-bold">{loadingMetrics ? '—' : (readMetric(metrics, ['total_Publicaciones','totalPublicaciones','total_publicaciones','total_publications','totalPublications']) ?? '0')}</div>
+              <div className="p-4 rounded-lg bg-white shadow flex flex-col items-center justify-center text-center">
+                <div className="text-sm text-muted-foreground text-center font-bold">Total Publicaciones</div>
+                <div className="text-2xl font-bold text-center">{loadingMetrics ? '—' : (readMetric(metrics, ['total_Publicaciones','totalPublicaciones','total_publicaciones','total_publications','totalPublications']) ?? '0')}</div>
                 <div className="text-sm text-green-600 mt-2">{readMetric(metrics, ['publicationsChange','publications_change','publicationsDelta']) ?? ''}</div>
               </div>
-              <div className="p-4 rounded-lg bg-white shadow flex flex-col">
-                <div className="text-sm text-muted-foreground">Publicaciones Resueltas</div>
-                <div className="text-2xl font-bold">{loadingMetrics ? '—' : (readMetric(metrics, ['total_Publicaciones_Resueltas','totalPublicacionesResueltas','total_resolved']) ?? '0')}</div>
+              <div className="p-4 rounded-lg bg-white shadow flex flex-col items-center justify-center text-center">
+                <div className="text-sm text-muted-foreground text-center font-bold">Publicaciones Resueltas</div>
+                <div className="text-2xl font-bold text-center">{loadingMetrics ? '—' : (readMetric(metrics, ['total_Publicaciones_Resueltas','totalPublicacionesResueltas','total_resolved']) ?? '0')}</div>
                 <div className="text-sm text-green-600 mt-2">{readMetric(metrics, ['resolvedChange','resolved_change']) ?? ''}</div>
               </div>
-              <div className="p-4 rounded-lg bg-white shadow flex flex-col">
-                <div className="text-sm text-muted-foreground">Reportes Pendientes</div>
-                <div className="text-2xl font-bold">{loadingMetrics ? '—' : (readMetric(metrics, ['reports_Pendientes','reportsPendientes','pendingReports','pending_reports']) ?? '0')}</div>
+              <div className="p-4 rounded-lg bg-white shadow flex flex-col items-center justify-center text-center">
+                <div className="text-sm text-muted-foreground text-center font-bold">Reportes Pendientes</div>
+                <div className="text-2xl font-bold text-center">{loadingMetrics ? '—' : (readMetric(metrics, ['reports_Pendientes','reportsPendientes','pendingReports','pending_reports']) ?? '0')}</div>
                 <div className="text-sm text-green-600 mt-2">{readMetric(metrics, ['reportsChange','reports_change']) ?? ''}</div>
+              </div>
+              <div className="p-4 rounded-lg bg-white shadow flex flex-col items-center justify-center text-center">
+                <div className="text-sm text-muted-foreground text-center font-bold">Publicaciones Ocultas</div>
+                <div className="text-2xl font-bold text-center">{loadingMetrics ? '—' : (readMetric(metrics, ['total_Publicaciones_Ocultas','totalPublicacionesOcultas','total_hidden']) ?? '0')}</div>  
+              </div>
+              <div className="p-4 rounded-lg bg-white shadow flex flex-col items-center justify-center text-center">
+                <div className="text-sm text-muted-foreground text-center font-bold">Publicaciones Eliminadas</div>
+                <div className="text-2xl font-bold text-center">{loadingMetrics ? '—' : (readMetric(metrics, ['total_Publicaciones_Eliminadas','totalPublicacionesEliminadas','total_deleted']) ?? '0')}</div>
+                <div className="text-sm text-amber-600 mt-2">Histórico de publicaciones eliminadas</div>
               </div>
             </div>
           </div>
@@ -214,44 +333,18 @@ export default function Dashboard() {
                           </div>
                         </div>
                         <div className="mt-3 flex gap-2">
-                          <button className="px-3 py-1 bg-yellow-100 rounded" onClick={async () => {
-                            const motivo = window.prompt('Motivo para ocultar publicación (opcional):');
-                            if (motivo === null) return; // usuario canceló
-                            try {
-                              await adminService.ocultarPublicacion(String(user?.id), String(id), motivo || '');
-                              alert('Publicación ocultada');
-                              setReported((prev) => prev.filter(x => String(x.reportId ?? x.id ?? x.report_id ?? '') !== id));
-                            } catch (e) { alert(String(e)); }
+                          <button className="px-3 py-1 bg-yellow-100 rounded" onClick={() => {
+                            setConfirmType('ocultar'); setConfirmPayload({ id, userId: String(user?.id) }); setConfirmMotivo(''); setConfirmOpen(true);
                           }}>Ocultar</button>
-                          <button className="px-3 py-1 bg-red-100 rounded" onClick={async () => {
-                            if (!window.confirm('¿Eliminar publicación definitivamente?')) return;
-                            const motivo = window.prompt('Motivo para eliminar (opcional):');
-                            if (motivo === null) return; // usuario canceló
-                            try {
-                              await adminService.eliminarPublicacion(String(user?.id), String(id), motivo || '');
-                              alert('Publicación eliminada');
-                              setReported((prev) => prev.filter(x => String(x.reportId ?? x.id ?? x.report_id ?? '') !== id));
-                            } catch (e) { alert(String(e)); }
+                          <button className="px-3 py-1 bg-red-100 rounded" onClick={() => {
+                            setConfirmType('eliminar'); setConfirmPayload({ id, userId: String(user?.id) }); setConfirmMotivo(''); setConfirmOpen(true);
                           }}>Eliminar</button>
-                          <button className="px-3 py-1 bg-gray-100 rounded" onClick={async () => {
-                            const motivo = window.prompt('Motivo para ignorar reporte (opcional):');
-                            if (motivo === null) return; // usuario canceló
-                            try {
-                              await adminService.ignorarReporte(String(user?.id), String(id), motivo || '');
-                              alert('Reporte ignorado');
-                              setReported((prev) => prev.filter(x => String(x.reportId ?? x.id ?? x.report_id ?? '') !== id));
-                            } catch (e) { alert(String(e)); }
+                          <button className="px-3 py-1 bg-gray-100 rounded" onClick={() => {
+                            setConfirmType('ignorar'); setConfirmPayload({ id, userId: String(user?.id) }); setConfirmMotivo(''); setConfirmOpen(true);
                           }}>Ignorar</button>
-                          <button className="px-3 py-1 bg-pink-100 rounded" onClick={async () => {
-                            if (!ownerId) { alert('No se conoce el usuario propietario'); return; }
-                            if (!window.confirm('Bloquear/desactivar al usuario propietario?')) return;
-                            try {
-                              const res = await fetch(`${(import.meta.env.VITE_API_URL as string) || 'http://localhost:8080'}/api/admin/users/${ownerId}/deactivate`, {
-                                method: 'POST', headers: { 'X-User-Id': String(user?.id), 'Content-Type': 'application/json' }
-                              });
-                              if (!res.ok) throw new Error(await res.text());
-                              alert('Usuario bloqueado/desactivado');
-                            } catch (e) { alert(String(e)); }
+                          <button className="px-3 py-1 bg-pink-100 rounded" onClick={() => {
+                            if (!ownerId) { setFlashMessage('No se conoce el usuario propietario'); return; }
+                            setConfirmType('bloquear'); setConfirmPayload({ ownerId, userId: String(user?.id) }); setConfirmMotivo(''); setConfirmOpen(true);
                           }}>Bloquear usuario</button>
                         </div>
                       </Card>
@@ -295,6 +388,8 @@ export default function Dashboard() {
                   />
                 ))
               )}
+              {/* User's personal lists (reportadas/ocultas/eliminadas) shown inline for context */}
+              {!isAdmin && renderUserPersonalLists()}
               {loadingHidden ? (
                 <div className="text-sm text-muted-foreground">Cargando publicaciones ocultas...</div>
               ) : hiddenList.length === 0 ? null : (
@@ -410,7 +505,7 @@ export default function Dashboard() {
         {restoreTarget ? (
           <div>
             <h4 className="font-bold mb-2">Restaurar publicación</h4>
-            <div className="mb-2 text-sm">{(restoreTarget.petName ?? restoreTarget.nombre ?? restoreTarget.name) || `Publicación ${String(restoreTarget.petId ?? restoreTarget.pet_id ?? '')}`}</div>
+            <div className="mb-2 text-sm">¿Está seguro de restaurar la publicación?</div>
             <label className="text-xs text-muted-foreground">Motivo (opcional)</label>
             <textarea value={restoreMotivo} onChange={(e) => setRestoreMotivo(e.target.value)} className="w-full border rounded p-2 mt-1 mb-3" rows={3} />
             <div className="flex gap-2 justify-end">
@@ -434,6 +529,68 @@ export default function Dashboard() {
           </div>
         ) : null}
       </Modal>
+
+      {/* Confirmation modal for reported actions */}
+      <Modal open={confirmOpen} onClose={() => { if (!confirmLoading) setConfirmOpen(false); }}>
+        <div>
+          <h4 className="font-bold mb-2">{confirmType === 'ocultar' ? 'Ocultar publicación' : confirmType === 'eliminar' ? 'Eliminar publicación' : confirmType === 'ignorar' ? 'Ignorar reporte' : confirmType === 'bloquear' ? 'Bloquear usuario' : 'Confirmar acción'}</h4>
+          <div className="mb-3 text-sm text-muted-foreground">
+            {confirmType === 'ocultar' && 'Confirma ocultar la publicación. Puedes indicar un motivo (opcional).'}
+            {confirmType === 'eliminar' && 'Esta acción eliminará la publicación definitivamente. Indica un motivo (opcional).'}
+            {confirmType === 'ignorar' && 'Confirmar que se ignorará este reporte. Puedes indicar un motivo (opcional).'}
+            {confirmType === 'bloquear' && 'Confirma bloquear/desactivar al usuario propietario.'}
+          </div>
+          {(confirmType === 'ocultar' || confirmType === 'eliminar' || confirmType === 'ignorar') && (
+            <textarea value={confirmMotivo} onChange={(e) => setConfirmMotivo(e.target.value)} className="w-full border rounded p-2 mt-1 mb-3" rows={3} placeholder="Motivo (opcional)" />
+          )}
+          <div className="flex gap-2 justify-end">
+            <button className="px-3 py-1 bg-white border rounded" onClick={() => { if (!confirmLoading) setConfirmOpen(false); }} disabled={confirmLoading}>Cancelar</button>
+            <button className="px-3 py-1 bg-red-100 rounded" onClick={async () => {
+              if (!confirmType || !confirmPayload) return;
+              setConfirmLoading(true);
+              try {
+                if (confirmType === 'ocultar') {
+                  await adminService.ocultarPublicacion(String(confirmPayload.userId), String(confirmPayload.id), confirmMotivo || '');
+                  setReported(prev => prev.filter(x => String(x.reportId ?? x.id ?? x.report_id ?? '') !== String(confirmPayload.id)));
+                  setFlashMessage('Publicación ocultada');
+                } else if (confirmType === 'eliminar') {
+                  await adminService.eliminarPublicacion(String(confirmPayload.userId), String(confirmPayload.id), confirmMotivo || '');
+                  setReported(prev => prev.filter(x => String(x.reportId ?? x.id ?? x.report_id ?? '') !== String(confirmPayload.id)));
+                  setFlashMessage('Publicación eliminada');
+                } else if (confirmType === 'ignorar') {
+                  await adminService.ignorarReporte(String(confirmPayload.userId), String(confirmPayload.id), confirmMotivo || '');
+                  setReported(prev => prev.filter(x => String(x.reportId ?? x.id ?? x.report_id ?? '') !== String(confirmPayload.id)));
+                  setFlashMessage('Reporte ignorado');
+                } else if (confirmType === 'bloquear') {
+                  const ownerId = String(confirmPayload.ownerId);
+                  const res = await fetch(`${(import.meta.env.VITE_API_URL as string) || 'http://localhost:8080'}/api/admin/users/${ownerId}/deactivate`, {
+                    method: 'POST', headers: { 'X-User-Id': String(confirmPayload.userId), 'Content-Type': 'application/json' }
+                  });
+                  if (!res.ok) throw new Error(await res.text());
+                  setFlashMessage('Usuario bloqueado/desactivado');
+                }
+                setConfirmOpen(false);
+              } catch (e) {
+                setFlashMessage(String(e));
+              } finally {
+                setConfirmLoading(false);
+                setConfirmMotivo('');
+                setConfirmType(null);
+                setConfirmPayload(null);
+              }
+            }} disabled={confirmLoading}>{confirmLoading ? 'Procesando...' : 'Confirmar'}</button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* flash message */}
+      {flashMessage && (
+        <div className="fixed bottom-6 right-6 z-50">
+          <div className="bg-black text-white px-4 py-2 rounded">{flashMessage}</div>
+        </div>
+      )}
+
+      
 
       <PrincipalModal
         mascota={selected}

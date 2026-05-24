@@ -29,7 +29,7 @@ export function PetCard({
   return (
     <Card
       accent={pet.highlight ? "gold" : "neutral"}
-      className={`relative flex gap-2 p-3 w-80 h-32 items-start cursor-pointer ${className}`}
+      className={`relative flex gap-2 p-3 w-full h-32 items-start cursor-pointer ${className}`}
       {...props}
       onClick={onClick}
       onKeyDown={handleKeyDown}
