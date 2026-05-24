@@ -215,21 +215,30 @@ export default function Dashboard() {
                         </div>
                         <div className="mt-3 flex gap-2">
                           <button className="px-3 py-1 bg-yellow-100 rounded" onClick={async () => {
-                            const motivo = window.prompt('Motivo para ocultar publicación (opcional):') ?? '';
-                            try { await adminService.ocultarPublicacion(String(user?.id), String(id), motivo); alert('Publicación ocultada');
+                            const motivo = window.prompt('Motivo para ocultar publicación (opcional):');
+                            if (motivo === null) return; // usuario canceló
+                            try {
+                              await adminService.ocultarPublicacion(String(user?.id), String(id), motivo || '');
+                              alert('Publicación ocultada');
                               setReported((prev) => prev.filter(x => String(x.reportId ?? x.id ?? x.report_id ?? '') !== id));
                             } catch (e) { alert(String(e)); }
                           }}>Ocultar</button>
                           <button className="px-3 py-1 bg-red-100 rounded" onClick={async () => {
                             if (!window.confirm('¿Eliminar publicación definitivamente?')) return;
-                            const motivo = window.prompt('Motivo para eliminar (opcional):') ?? '';
-                            try { await adminService.eliminarPublicacion(String(user?.id), String(id), motivo); alert('Publicación eliminada');
+                            const motivo = window.prompt('Motivo para eliminar (opcional):');
+                            if (motivo === null) return; // usuario canceló
+                            try {
+                              await adminService.eliminarPublicacion(String(user?.id), String(id), motivo || '');
+                              alert('Publicación eliminada');
                               setReported((prev) => prev.filter(x => String(x.reportId ?? x.id ?? x.report_id ?? '') !== id));
                             } catch (e) { alert(String(e)); }
                           }}>Eliminar</button>
                           <button className="px-3 py-1 bg-gray-100 rounded" onClick={async () => {
-                            const motivo = window.prompt('Motivo para ignorar reporte (opcional):') ?? '';
-                            try { await adminService.ignorarReporte(String(user?.id), String(id), motivo); alert('Reporte ignorado');
+                            const motivo = window.prompt('Motivo para ignorar reporte (opcional):');
+                            if (motivo === null) return; // usuario canceló
+                            try {
+                              await adminService.ignorarReporte(String(user?.id), String(id), motivo || '');
+                              alert('Reporte ignorado');
                               setReported((prev) => prev.filter(x => String(x.reportId ?? x.id ?? x.report_id ?? '') !== id));
                             } catch (e) { alert(String(e)); }
                           }}>Ignorar</button>
