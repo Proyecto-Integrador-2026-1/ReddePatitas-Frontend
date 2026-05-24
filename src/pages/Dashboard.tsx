@@ -135,7 +135,7 @@ export default function Dashboard() {
               {userReported.map((r: any, idx) => (
                 <Card key={idx} className="p-3">
                   <div className="flex gap-3 items-start">
-                    <img src={normalizeImage(r.thumbnailUrl ?? r.thumbnail_url ?? r.imagenUrl ?? r.imagen_url ?? '')} alt="mini" className="h-16 w-16 rounded object-cover flex-shrink-0" />
+                    <img src={normalizeImage(r.thumbnailUrl ?? r.thumbnail_url ?? r.imagenUrl ?? r.imagen_url ?? '')} alt="mini" className="h-12 w-12 sm:h-16 sm:w-16 rounded object-cover flex-shrink-0" />
                     <div className="flex-1">
                       <div className="text-sm font-medium">{r.petName ?? r.nombre ?? r.name ?? `Publicación ${String(r.petId ?? r.pet_id ?? '')}`}</div>
                       {r.fechaCreacion && <div className="text-xs text-muted-foreground">{new Date(r.fechaCreacion).toLocaleString()}</div>}
@@ -154,7 +154,7 @@ export default function Dashboard() {
               {userHidden.map((h: any, idx) => (
                 <Card key={idx} className="p-3">
                   <div className="flex gap-3 items-start">
-                    <img src={normalizeImage(h.thumbnailUrl ?? h.thumbnail_url ?? h.imagenUrl ?? h.imagen_url ?? h.image ?? '')} alt="mini" className="h-16 w-16 rounded object-cover flex-shrink-0" />
+                    <img src={normalizeImage(h.thumbnailUrl ?? h.thumbnail_url ?? h.imagenUrl ?? h.imagen_url ?? h.image ?? '')} alt="mini" className="h-12 w-12 sm:h-16 sm:w-16 rounded object-cover flex-shrink-0" />
                     <div className="flex-1">
                       <div className="text-sm font-medium">{h.petName ?? h.nombre ?? h.name ?? `Publicación ${String(h.petId ?? h.pet_id ?? '')}`}</div>
                       {h.fechaCreacion && <div className="text-xs text-muted-foreground">{new Date(h.fechaCreacion).toLocaleString()}</div>}
@@ -173,7 +173,7 @@ export default function Dashboard() {
               {userDeleted.map((d: any, idx) => (
                 <Card key={idx} className="p-3">
                   <div className="flex gap-3 items-start">
-                    <img src={normalizeImage(d.thumbnailUrl ?? d.thumbnail_url ?? d.imagenUrl ?? d.imagen_url ?? d.image ?? '')} alt="mini" className="h-16 w-16 rounded object-cover flex-shrink-0" />
+                    <img src={normalizeImage(d.thumbnailUrl ?? d.thumbnail_url ?? d.imagenUrl ?? d.imagen_url ?? d.image ?? '')} alt="mini" className="h-12 w-12 sm:h-16 sm:w-16 rounded object-cover flex-shrink-0" />
                     <div className="flex-1">
                       <div className="text-sm font-medium">{d.petName ?? d.nombre ?? d.name ?? `Publicación ${String(d.petId ?? d.pet_id ?? '')}`}</div>
                       {d.fechaCreacion && <div className="text-xs text-muted-foreground">{new Date(d.fechaCreacion).toLocaleString()}</div>}
@@ -239,7 +239,7 @@ export default function Dashboard() {
         {isAdmin && (
           <div className="mb-6">
             <h3 className="text-lg font-bold mb-3">Métricas de administración</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
               <div className="p-4 rounded-lg bg-white shadow flex flex-col items-center justify-center text-center border border-red-200">
                 <div className="text-sm text-muted-foreground text-center font-bold">Publicaciones Reportadas</div>
                 <div className="text-2xl font-bold text-red-600 text-center">{loadingMetrics ? '—' : (readMetric(metrics, ['total_Publicaciones_Reportadas','totalPublicacionesReportadas','total_reported','reported_count']) ?? '0')}</div>
@@ -321,7 +321,7 @@ export default function Dashboard() {
                     return (
                       <Card key={id} className="p-3">
                         <div className="flex gap-4 items-start">
-                          <img src={thumbnail} alt="mascota" className="h-24 w-24 rounded object-cover" />
+                          <img src={thumbnail} alt="mascota" className="h-16 w-16 sm:h-24 sm:w-24 rounded object-cover flex-shrink-0" />
                           <div className="flex-1">
                             <div className="font-semibold text-lg">{petName}{petStatus ? ` - ${petStatus}` : ''}</div>
                             <div className="text-sm text-muted-foreground">Publicado por: <span className="font-medium">{publisherName}</span></div>
@@ -478,23 +478,45 @@ export default function Dashboard() {
       </div>
 
       {showHistory && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded max-w-2xl w-full">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white p-4 sm:p-6 rounded max-w-lg sm:max-w-2xl w-full mx-2 sm:mx-0">
             <div className="flex justify-between items-center mb-4">
               <h4 className="font-bold">Historial de moderación</h4>
               <button className="px-2 py-1" onClick={() => setShowHistory(false)}>Cerrar</button>
             </div>
-            <div className="space-y-2 max-h-96 overflow-auto">
+            <div className="max-h-96 overflow-auto">
               {history.length === 0 ? (
                 <div className="text-sm text-muted-foreground">No hay acciones registradas.</div>
               ) : (
-                history.map((h, idx) => (
-                  <div key={idx} className="p-2 border rounded">
-                    <div className="text-sm font-semibold">{h.action ?? h.tipo ?? 'Acción'}</div>
-                    <div className="text-xs text-muted-foreground">{h.detail ?? h.descripcion ?? JSON.stringify(h)}</div>
-                    <div className="text-xs text-muted-foreground">{h.actorId ? `Por: ${h.actorId}` : ''} {h.fecha ? ` • ${h.fecha}` : ''}</div>
-                  </div>
-                ))
+                <ul className="space-y-4">
+                  {history.map((h, idx) => {
+                    const tipo = String(h.tipoAccion ?? h.tipo ?? h.action ?? 'Acción');
+                    const fecha = h.creadoEn ?? h.creado_en ?? h.creado ?? h.createdAt ?? h.created_at ?? null;
+                    const fechaObj = fecha ? new Date(fecha) : null;
+                    const fechaStr = fechaObj ? fechaObj.toLocaleString('es-AR', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) : '—';
+                    const quien = String(h.realizadoPor ?? h.realizado_por ?? h.actor ?? h.user ?? '—');
+                    const objetivo = String(h.idObjetivo ?? h.id_objetivo ?? h.idObjetiv ?? h.targetId ?? h.id ?? '—');
+                    const motivo = h.motivo ?? h.reason ?? h.detail ?? '';
+                    const color = tipo.toLowerCase().includes('elim') ? 'bg-red-100 text-red-800' : tipo.toLowerCase().includes('ocult') ? 'bg-yellow-100 text-yellow-800' : tipo.toLowerCase().includes('restaur') ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800';
+                    return (
+                      <li key={idx}>
+                        <div className="bg-white p-3 rounded shadow-sm border flex flex-col sm:flex-row sm:items-center gap-4">
+                          <div className="sm:w-36 w-full text-sm text-muted-foreground sm:text-right text-left whitespace-nowrap">{fechaStr}</div>
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className={`px-2 py-1 rounded-full text-sm font-semibold ${color}`}>{tipo}</div>
+                              </div>
+                              <div className="text-xs text-muted-foreground">Por: <span className="font-medium">{quien}</span></div>
+                            </div>
+                            <div className="mt-2 text-sm text-muted-foreground">Objetivo: <span className="font-medium text-[#020826] break-words">{objetivo}</span></div>
+                            {motivo && <div className="mt-2 text-sm text-[#5c4e34]">Motivo: {String(motivo)}</div>}
+                          </div>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
               )}
             </div>
           </div>
