@@ -50,6 +50,11 @@ export default function Dashboard() {
     return undefined;
   }
 
+  function petNameOrSinNombre(item: any) {
+    const n = String(item?.petName ?? item?.pet_name ?? item?.nombre ?? item?.nombreMascota ?? item?.nombre_mascota ?? item?.name ?? item?.title ?? '').trim();
+    return n || 'sin nombre';
+  }
+
   useEffect(() => {
     if (!isAuthenticated && !isLoading) {
       navigate('/login');
@@ -137,7 +142,7 @@ export default function Dashboard() {
                   <div className="flex gap-3 items-start">
                     <img src={normalizeImage(r.thumbnailUrl ?? r.thumbnail_url ?? r.imagenUrl ?? r.imagen_url ?? '')} alt="mini" className="h-12 w-12 sm:h-16 sm:w-16 rounded object-cover flex-shrink-0" />
                     <div className="flex-1">
-                      <div className="text-sm font-medium">{r.petName ?? r.nombre ?? r.name ?? `Publicación ${String(r.petId ?? r.pet_id ?? '')}`}</div>
+                      <div className="text-sm font-medium">{petNameOrSinNombre(r)}</div>
                       {r.fechaCreacion && <div className="text-xs text-muted-foreground">{new Date(r.fechaCreacion).toLocaleString()}</div>}
                     </div>
                   </div>
@@ -151,17 +156,22 @@ export default function Dashboard() {
           <div className="mt-4">
             <h4 className="text-md font-semibold mb-2">Mis publicaciones ocultas</h4>
             <div className="space-y-2">
-              {userHidden.map((h: any, idx) => (
-                <Card key={idx} className="p-3">
-                  <div className="flex gap-3 items-start">
-                    <img src={normalizeImage(h.thumbnailUrl ?? h.thumbnail_url ?? h.imagenUrl ?? h.imagen_url ?? h.image ?? '')} alt="mini" className="h-12 w-12 sm:h-16 sm:w-16 rounded object-cover flex-shrink-0" />
-                    <div className="flex-1">
-                      <div className="text-sm font-medium">{h.petName ?? h.nombre ?? h.name ?? `Publicación ${String(h.petId ?? h.pet_id ?? '')}`}</div>
-                      {h.fechaCreacion && <div className="text-xs text-muted-foreground">{new Date(h.fechaCreacion).toLocaleString()}</div>}
+              {userHidden.map((h: any, idx) => {
+                const tipoRaw = String(h.tipoReporte ?? h.tipo_reporte ?? h.tipo ?? '').toLowerCase();
+                const tipoLabel = tipoRaw.includes('perd') ? 'PERDIDO' : (tipoRaw.includes('encon') || tipoRaw.includes('encontr') ? 'ENCONTRADO' : '');
+                return (
+                  <Card key={idx} className="p-3">
+                    <div className="flex gap-3 items-start">
+                      <img src={normalizeImage(h.thumbnailUrl ?? h.thumbnail_url ?? h.imagenUrl ?? h.imagen_url ?? h.image ?? '')} alt="mini" className="h-12 w-12 sm:h-16 sm:w-16 rounded object-cover flex-shrink-0" />
+                      <div className="flex-1">
+                        <div className="text-sm font-medium">{petNameOrSinNombre(h)}</div>
+                        {tipoLabel && <div className="text-xs text-muted-foreground">Tipo: <span className="font-medium">{tipoLabel}</span></div>}
+                        {h.fechaCreacion && <div className="text-xs text-muted-foreground">{new Date(h.fechaCreacion).toLocaleString()}</div>}
+                      </div>
                     </div>
-                  </div>
-                </Card>
-              ))}
+                  </Card>
+                );
+              })}
             </div>
           </div>
         )}
@@ -170,17 +180,22 @@ export default function Dashboard() {
           <div className="mt-4">
             <h4 className="text-md font-semibold mb-2">Mis publicaciones eliminadas</h4>
             <div className="space-y-2">
-              {userDeleted.map((d: any, idx) => (
-                <Card key={idx} className="p-3">
-                  <div className="flex gap-3 items-start">
-                    <img src={normalizeImage(d.thumbnailUrl ?? d.thumbnail_url ?? d.imagenUrl ?? d.imagen_url ?? d.image ?? '')} alt="mini" className="h-12 w-12 sm:h-16 sm:w-16 rounded object-cover flex-shrink-0" />
-                    <div className="flex-1">
-                      <div className="text-sm font-medium">{d.petName ?? d.nombre ?? d.name ?? `Publicación ${String(d.petId ?? d.pet_id ?? '')}`}</div>
-                      {d.fechaCreacion && <div className="text-xs text-muted-foreground">{new Date(d.fechaCreacion).toLocaleString()}</div>}
+              {userDeleted.map((d: any, idx) => {
+                const tipoRaw = String(d.tipoReporte ?? d.tipo_reporte ?? d.tipo ?? '').toLowerCase();
+                const tipoLabel = tipoRaw.includes('perd') ? 'PERDIDO' : (tipoRaw.includes('encon') || tipoRaw.includes('encontr') ? 'ENCONTRADO' : '');
+                return (
+                  <Card key={idx} className="p-3">
+                    <div className="flex gap-3 items-start">
+                      <img src={normalizeImage(d.thumbnailUrl ?? d.thumbnail_url ?? d.imagenUrl ?? d.imagen_url ?? d.image ?? '')} alt="mini" className="h-12 w-12 sm:h-16 sm:w-16 rounded object-cover flex-shrink-0" />
+                      <div className="flex-1">
+                        <div className="text-sm font-medium">{petNameOrSinNombre(d)}</div>
+                        {tipoLabel && <div className="text-xs text-muted-foreground">Tipo: <span className="font-medium">{tipoLabel}</span></div>}
+                        {d.fechaCreacion && <div className="text-xs text-muted-foreground">{new Date(d.fechaCreacion).toLocaleString()}</div>}
+                      </div>
                     </div>
-                  </div>
-                </Card>
-              ))}
+                  </Card>
+                );
+              })}
             </div>
           </div>
         )}
@@ -401,6 +416,8 @@ export default function Dashboard() {
                       const title = h.petName ?? h.nombre ?? h.nombreMascota ?? h.name ?? `Publicación ${String(h.petId ?? h.pet_id ?? '')}`;
                       const pub = h.publisherName ?? h.publisher_name ?? h.publisher ?? '—';
                       const time = h.fechaCreacion ?? h.fecha_creacion ?? h.createdAt ?? h.created_at ?? '';
+                      const tipoRaw = String(h.tipoReporte ?? h.tipo_reporte ?? h.tipo ?? '').toLowerCase();
+                      const tipoLabel = tipoRaw.includes('perd') ? 'PERDIDO' : (tipoRaw.includes('encon') || tipoRaw.includes('encontr') ? 'ENCONTRADO' : '');
                       return (
                         <Card
                           key={String(h.reportId ?? h.id ?? h.report_id ?? h.publicationId ?? h.id)}
@@ -410,6 +427,7 @@ export default function Dashboard() {
                           <img src={thumb} alt="miniatura" className="h-16 w-16 rounded-lg object-cover flex-shrink-0" />
                           <div className="flex-1">
                             <div className="text-sm font-medium">{title}</div>
+                            {tipoLabel && <div className="text-xs text-muted-foreground">Tipo: <span className="font-medium">{tipoLabel}</span></div>}
                             <div className="text-xs text-muted-foreground">Publicado por: <span className="font-medium">{pub}</span></div>
                             {time && <div className="text-xs text-muted-foreground">{new Date(time).toLocaleString()}</div>}
                           </div>
@@ -458,11 +476,14 @@ export default function Dashboard() {
                       const title = d.petName ?? d.nombre ?? d.nombreMascota ?? d.name ?? `Publicación ${String(d.petId ?? d.pet_id ?? '')}`;
                       const pub = d.publisherName ?? d.publisher_name ?? d.publisher ?? '—';
                       const time = d.fechaCreacion ?? d.fecha_creacion ?? d.createdAt ?? d.created_at ?? '';
+                      const tipoRaw = String(d.tipoReporte ?? d.tipo_reporte ?? d.tipo ?? '').toLowerCase();
+                      const tipoLabel = tipoRaw.includes('perd') ? 'PERDIDO' : (tipoRaw.includes('encon') || tipoRaw.includes('encontr') ? 'ENCONTRADO' : '');
                       return (
                         <Card key={String(d.reportId ?? d.id ?? d.report_id ?? d.publicationId ?? d.id)} className="p-3 flex gap-3 items-start">
                           <img src={thumb} alt="miniatura" className="h-16 w-16 rounded-lg object-cover flex-shrink-0" />
                           <div className="flex-1">
                             <div className="text-sm font-medium">{title}</div>
+                            {tipoLabel && <div className="text-xs text-muted-foreground">Tipo: <span className="font-medium">{tipoLabel}</span></div>}
                             <div className="text-xs text-muted-foreground">Publicado por: <span className="font-medium">{pub}</span></div>
                             {time && <div className="text-xs text-muted-foreground">{new Date(time).toLocaleString()}</div>}
                           </div>
@@ -500,7 +521,7 @@ export default function Dashboard() {
                     const color = tipo.toLowerCase().includes('elim') ? 'bg-red-100 text-red-800' : tipo.toLowerCase().includes('ocult') ? 'bg-yellow-100 text-yellow-800' : tipo.toLowerCase().includes('restaur') ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800';
                     return (
                       <li key={idx}>
-                        <div className="bg-white p-3 rounded shadow-sm border flex flex-col sm:flex-row sm:items-center gap-4">
+                        <div className="bg-white p-3 rounded-lg border border-gray-200 shadow-lg ring-1 ring-gray-100 hover:shadow-2xl transition-shadow flex flex-col sm:flex-row sm:items-center gap-4">
                           <div className="sm:w-36 w-full text-sm text-muted-foreground sm:text-right text-left whitespace-nowrap">{fechaStr}</div>
                           <div className="flex-1">
                             <div className="flex items-center justify-between">
