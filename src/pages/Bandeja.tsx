@@ -6,6 +6,7 @@ import messagingService from '../services/mensajeriaService';
 import { fetchMascotas } from '../services/principalService';
 import { Avatar, Button, Badge } from '../components/ui';
 import { normalizeImage, assets } from '../lib/imageUtils';
+import websocketService from '../services/websocketService';
 const API_BASE = (import.meta.env.VITE_API_URL as string) || 'http://localhost:8080';
 
 export default function MessagesPage() {
@@ -22,6 +23,98 @@ export default function MessagesPage() {
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const location = useLocation();
+
+
+    // Función para normalizar una conversación (reutilizable)
+  const normalizeConversation = (c: any, reportsIndex: Record<string, any> | null, currentUserId: string) => {
+    const id = c.id || c.userConversationId || c.user_conversation_id || c.userConversation?.id || '';
+    const conversationId = c.conversationId || c.conversacionId || c.conversation?.id || '';
+    const reportCandidateId = c.report?.id || c.reportId || null;
+    const reportEntry = reportCandidateId && reportsIndex ? reportsIndex[reportCandidateId] : null;
+
+    const mascotaName = reportEntry?.nombre || reportEntry?.pet?.nombre || c?.mascota?.nombre || c.mascotaName || 'Mascota sin nombre';
+
+    const rawThumbCandidates = [
+      reportEntry?.thumbnail_url, reportEntry?.imagen_url, reportEntry?.imagen, reportEntry?.image,
+      c.mascota?.thumbnail_url, c.mascota?.imagen_url, c.thumbnail,
+      c.report?.pet?.thumbnail_url, c.report?.pet?.imagen_url,
+    ];
+    const rawThumb = rawThumbCandidates.find(Boolean) || '';
+    let thumbnail = normalizeImage(rawThumb);
+    if (!rawThumb || thumbnail === assets.max) thumbnail = assets.max;
+
+    const rawOwner = c.otherUserId ?? c.ownerId ?? (c.owner && (c.owner.id ?? c.owner)) ?? c.publicadorId ?? null;
+    const ownerIdStr = rawOwner != null ? String(rawOwner) : null;
+    const normalizedOwner = ownerIdStr ? String(ownerIdStr).toLowerCase().trim() : null;
+    const normalizedUser = currentUserId ? String(currentUserId).toLowerCase().trim() : null;
+    const publisherId = (normalizedOwner && normalizedUser && normalizedOwner === normalizedUser && c.userId2)
+      ? String(c.userId2)
+      : (ownerIdStr || c.publisherId || c.publicadorId || c.otherUserId || '');
+    const publisherName = c.otherUserName || c.publisher?.displayName || c.publisherName || '';
+
+    const lastMessage = c.lastMessage || c.ultimoMensaje || c.last || null;
+    const unreadCount = Number(c.unreadCount ?? c.unread ?? 0);
+
+    return {
+      ...c,
+      id: String(id),
+      conversationId: String(conversationId || ''),
+      mascotaName,
+      thumbnail,
+      publisherId,
+      publisherName,
+      lastMessage,
+      unreadCount,
+      reportId: reportCandidateId,
+      ownerId: ownerIdStr,
+    };
+  };
+
+    // Función para recargar conversaciones (reutilizable)
+  const refreshConversations = async () => {
+    if (!userId) return;
+    try {
+      const resp = await messagingService.listConversations(userId);
+      const rawConvs = Array.isArray(resp?.conversations) ? resp.conversations : [];
+
+      // Cargar reportsIndex para nombres de mascotas
+      let reportsIndex: Record<string, any> | null = null;
+      try {
+        const list = await fetchMascotas();
+        if (Array.isArray(list)) {
+          reportsIndex = list.reduce((acc: Record<string, any>, r: any) => {
+            if (r && r.id) acc[String(r.id)] = r;
+            return acc;
+          }, {});
+        }
+      } catch (e) {
+        reportsIndex = null;
+      }
+
+      const processedConvs = rawConvs.map((c: any) => normalizeConversation(c, reportsIndex, userId));
+      setConversations(processedConvs);
+      
+      // Actualizar conversación seleccionada si existe
+      if (selectedConv) {
+        const updated = processedConvs.find((c: any) => c.id === selectedConv.id);
+        if (updated) setSelectedConv(updated);
+      }
+    } catch (err) {
+      console.error('Error refreshing conversations:', err);
+    }
+  };
+
+  // Función para recargar mensajes de una conversación
+  const refreshMessages = async (conversationId: string) => {
+    if (!userId) return;
+    try {
+      const msgs = await messagingService.getConversationMessages(conversationId, userId);
+      setMessages(Array.isArray(msgs) ? msgs : []);
+      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+    } catch (err) {
+      console.error('Error refreshing messages:', err);
+    }
+  };
 
   useEffect(() => {
     if (!userId) return;
@@ -273,9 +366,58 @@ export default function MessagesPage() {
     };
     load();
 
-    const iv = setInterval(load, 30000);
+    const iv = setInterval(load, 60000);
     return () => { mounted = false; clearInterval(iv); };
   }, [userId]);
+
+
+  // Escuchar eventos WebSocket para actualizar conversaciones y mensajes en tiempo real
+  useEffect(() => {
+    if (!userId) return;
+
+    // Handler para nuevo mensaje
+    const handleNewMessage = (notification: any) => {
+      console.log('📨 Bandeja: Nuevo mensaje recibido', notification);
+      
+      // Actualizar lista de conversaciones (recargar)
+      refreshConversations();
+      
+      // Si la conversación activa es la que recibió el mensaje, recargar mensajes
+      if (selectedConv && notification.userConversationId === selectedConv.id) {
+        refreshMessages(selectedConv.id);
+      }
+    };
+
+    // Handler para mensajes leídos
+    const handleMessagesRead = (notification: any) => {
+      console.log('✓ Bandeja: Mensajes marcados como leídos', notification);
+      refreshConversations();
+    };
+
+    // Handler para conversación eliminada
+    const handleConversationDeleted = (notification: any) => {
+      console.log('🗑️ Bandeja: Conversación eliminada', notification);
+      refreshConversations();
+      
+      // Si la conversación eliminada era la seleccionada, cerrarla
+      if (selectedConv && notification.userConversationId === selectedConv.id) {
+        setSelectedConv(null);
+        setMessages([]);
+      }
+    };
+
+    // Registrar handlers
+    websocketService.on('NEW_MESSAGE', handleNewMessage);
+    websocketService.on('MESSAGE_READ', handleMessagesRead);
+    websocketService.on('CONVERSATION_DELETED', handleConversationDeleted);
+
+    return () => {
+      websocketService.off('NEW_MESSAGE', handleNewMessage);
+      websocketService.off('MESSAGE_READ', handleMessagesRead);
+      websocketService.off('CONVERSATION_DELETED', handleConversationDeleted);
+    };
+  }, [userId, selectedConv]);
+
 
   useEffect(() => {
     if (!selectedConv) return;
@@ -414,6 +556,8 @@ export default function MessagesPage() {
                       <button
                         type="button"
                         className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1.5 rounded-full hover:bg-red-100 transition-all duration-200"
+                        aria-label={`Eliminar conversación con ${name}`}
+                        title={`Eliminar conversación con ${name}`}
                         onClick={async (e) => {
                           e.stopPropagation();
                           if (confirm(`¿Eliminar conversación con ${name}? Esta acción no se puede deshacer.`)) {
