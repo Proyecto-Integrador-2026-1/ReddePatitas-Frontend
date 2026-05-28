@@ -13,6 +13,7 @@ import { fetchMascotas } from "../services/principalService";
 
 import { useAuth } from '../hooks/useAuth';
 import messagingService from '../services/mensajeriaService';
+import websocketService from "../services/websocketService";
 import reportService from '../services/reportPublicationService';
 import reportsService from '../services/reportsService';
 import { RoleGuard } from '../components/RoleGuard';
@@ -135,6 +136,8 @@ export function Principal() {
   const [visibleMascotas, setVisibleMascotas] = useState<Mascota[]>([]);
   const [selectedMascota, setSelectedMascota] = useState<Mascota | null>(null);
   const [totalUnread, setTotalUnread] = useState<number>(0);
+  const isMounted = useRef(true);
+  const refreshTimeout = useRef<NodeJS.Timeout | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportedVersion, setReportedVersion] = useState(0);
 
@@ -200,7 +203,6 @@ export function Principal() {
   const filteredMascotas = useMemo(() => getFilteredMascotas(), [mascotas, filters.estado, filters.tipo]);
 
 
-
   useEffect(() => {
     let mounted = true;
     fetchMascotas()
@@ -215,55 +217,107 @@ export function Principal() {
   }, [reportedVersion]);
 
   // compute total unread messages across conversations (limited to first N to avoid heavy load)
+  const computeUnreadCount = async () => {
+    if (!isMounted.current) return;
+    
+    const userId = user?.id ?? null;
+    if (!userId) return;
+
+    try {
+      const resp = await messagingService
+        .listConversations(String(userId))
+        .catch(() => ({ conversations: [] as any[], totalUnread: 0 }));
+      
+      const convs: any[] = Array.isArray(resp?.conversations) ? resp.conversations : [];
+      
+      if (convs.length === 0) {
+        if (isMounted.current) setTotalUnread(0);
+        return;
+      }
+      
+      const limit = 12;
+      const toCheck = convs.slice(0, limit);
+      const settled = await Promise.allSettled(
+        toCheck.map((c) => messagingService.getConversationMessages(
+          String(c.id || c.conversacionId || c.conversationId), 
+          String(userId)
+        ))
+      );
+      
+      let total = 0;
+      for (const s of settled) {
+        if (s.status !== 'fulfilled') continue;
+        const msgs = Array.isArray((s as any).value) ? (s as any).value : [];
+        const unread = msgs.filter((m: any) => {
+          const from = String(m.remitenteId || m.senderId || m.from || '').toLowerCase();
+          const mine = from === String(userId).toLowerCase();
+          if (mine) return false;
+          
+          const estado = String(m.estado || m.status || '').toLowerCase();
+          if (estado) {
+            const readStates = ['leido', 'visto', 'read', 'seen', 'readed'];
+            const unreadStates = ['enviado', 'sent', 'nuevo', 'new', 'unread'];
+            if (readStates.includes(estado)) return false;
+            if (unreadStates.includes(estado)) return true;
+          }
+          
+          const readFlag = m.leido ?? m.read ?? m.visto ?? null;
+          const readAt = m.readAt ?? m.leidoAt ?? m.leido_fecha ?? null;
+          if (readFlag !== null) return !Boolean(readFlag);
+          if (readAt) return false;
+          if (m.unread !== undefined) return Boolean(m.unread);
+          return true;
+        }).length;
+        total += unread;
+      }
+      
+      if (isMounted.current) setTotalUnread(total);
+    } catch (e) {
+      console.error('Error computing unread count:', e);
+    }
+  };
+
+  // Cargar conteo inicial y escuchar eventos WebSocket
   useEffect(() => {
-    let mounted = true;
-    const compute = async () => {
-      try {
-        const userId = user?.id ?? null;
-        if (!userId) return;
-        const resp = await messagingService
-          .listConversations(String(userId))
-          .catch(() => ({ conversations: [] as any[], totalUnread: 0 }));
-        const convs: any[] = Array.isArray(resp?.conversations) ? resp.conversations : [];
-        if (convs.length === 0) {
-          if (mounted) setTotalUnread(0);
-          return;
-        }
-        const limit = 12;
-        const toCheck = convs.slice(0, limit);
-        const settled = await Promise.allSettled(toCheck.map((c) => messagingService.getConversationMessages(String(c.id || c.conversacionId || c.conversationId), String(userId))));
-        let total = 0;
-        for (const s of settled) {
-          if (s.status !== 'fulfilled') continue;
-          const msgs = Array.isArray((s as any).value) ? (s as any).value : [];
-          const unread = msgs.filter((m: any) => {
-            const from = String(m.remitenteId || m.senderId || m.from || '').toLowerCase();
-            const mine = from === String(userId).toLowerCase();
-            if (mine) return false;
-            const estado = String(m.estado || m.status || '').toLowerCase();
-            if (estado) {
-              const readStates = ['leido', 'visto', 'read', 'seen', 'readed'];
-              const unreadStates = ['enviado', 'sent', 'nuevo', 'new', 'unread'];
-              if (readStates.includes(estado)) return false;
-              if (unreadStates.includes(estado)) return true;
-            }
-            const readFlag = m.leido ?? m.read ?? m.visto ?? null;
-            const readAt = m.readAt ?? m.leidoAt ?? m.leido_fecha ?? null;
-            if (readFlag !== null) return !Boolean(readFlag);
-            if (readAt) return false;
-            if (m.unread !== undefined) return Boolean(m.unread);
-            return true;
-          }).length;
-          total += unread;
-        }
-        if (mounted) setTotalUnread(total);
-      } catch (e) {
-        // ignore
+    isMounted.current = true;
+    
+    // Cargar conteo inicial
+    computeUnreadCount();
+    
+    // 👇 NUEVO: Escuchar eventos de actualización desde WebSocket
+    const handleRefreshUnread = () => {
+      console.log('🔄 Actualizando badge de mensajes no leídos');
+      computeUnreadCount();
+    };
+    
+    // Escuchar evento personalizado (disparado desde App.tsx)
+    window.addEventListener('refresh-unread-count', handleRefreshUnread);
+    
+    // También escuchar directamente las notificaciones WebSocket (alternativa)
+    const handleWebSocketNotification = (notification: any) => {
+      if (notification.type === 'NEW_MESSAGE' || notification.type === 'MESSAGE_READ') {
+        console.log(`📡 Notificación WebSocket: ${notification.type}, actualizando badge`);
+        computeUnreadCount();
       }
     };
-    compute();
-    const iv = setInterval(compute, 30000);
-    return () => { mounted = false; clearInterval(iv); };
+    
+    websocketService.on('NEW_MESSAGE', handleWebSocketNotification);
+    websocketService.on('MESSAGE_READ', handleWebSocketNotification);
+    
+    // ✅ Mantener polling solo como respaldo (cada 60 segundos en lugar de 30)
+    const pollingInterval = setInterval(() => {
+      console.log('🔄 Polling de respaldo para badge');
+      computeUnreadCount();
+    }, 60000); // 60 segundos
+    
+    return () => {
+      isMounted.current = false;
+      window.removeEventListener('refresh-unread-count', handleRefreshUnread);
+      websocketService.off('NEW_MESSAGE', handleWebSocketNotification);
+      websocketService.off('MESSAGE_READ', handleWebSocketNotification);
+      if (pollingInterval) clearInterval(pollingInterval);
+      if (refreshTimeout.current) clearTimeout(refreshTimeout.current);
+    };
   }, [user?.id]);
 
   return (
@@ -470,9 +524,12 @@ export function PrincipalModal({
                   <strong className="text-sm">Enviar mensaje</strong>
                   <button className="text-sm text-muted-foreground" onClick={() => { setContactOpen(false); setMessage(''); }}>✕</button>
                 </div>
+                <Label htmlFor="contactMessage">Mensaje</Label>
                 <textarea
+                  id="contactMessage"
                   className="w-full mt-2 rounded-md border p-3 text-sm"
                   rows={6}
+                  placeholder="Escribe tu mensaje aquí"
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                 />
@@ -583,8 +640,15 @@ export function PrincipalModal({
               </label>
             </div>
             <div>
-              <Label>Mensaje de agradecimiento (opcional)</Label>
-              <textarea className="w-full rounded border p-2" rows={4} value={resolveMessage} onChange={(e) => setResolveMessage(e.target.value)} />
+              <Label htmlFor="resolveMessage">Mensaje de agradecimiento (opcional)</Label>
+              <textarea
+                id="resolveMessage"
+                className="w-full rounded border p-2"
+                rows={4}
+                placeholder="Escribe un mensaje de agradecimiento opcional"
+                value={resolveMessage}
+                onChange={(e) => setResolveMessage(e.target.value)}
+              />
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="ghost" size="sm" onClick={() => setResolveOpen(false)}>Cancelar</Button>
