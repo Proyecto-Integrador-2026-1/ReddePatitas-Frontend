@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Map, MapControls, MapMarker, MarkerContent, MarkerLabel, MarkerPopup } from "@/components/ui/map";
 import { Navigation } from "lucide-react";
 import { Button } from ".";
+import { SearchBar } from "./SearchBar";
 import type { Mascota } from "@/types/mascota";
 import { assets, normalizeImage } from "@/lib/imageUtils";
 
@@ -20,7 +21,6 @@ const getThumbnail = (m: Mascota): string =>
 const getOriginal = (m: Mascota): string =>
   m.imagen_url ? normalizeImage(m.imagen_url) : "";
 
-// Función para determinar el color del borde según el estado
 const getBorderColor = (estado?: string): string => {
   if (!estado) return "border-gray-400";
   const estadoLower = estado.toLowerCase();
@@ -39,38 +39,14 @@ export default function MapWithSearch({
   onSelectMascota?: (m: Mascota) => void;
 }) {
   const mapRef = useRef<any>(null);
-  const [searchInput, setSearchInput] = useState("");
-  const [searchQuery, setSearchQuery] = useState<string | undefined>(undefined);
 
-  // geocode when query changes
-  useEffect(() => {
-    if (!searchQuery) return;
+  // Manejar búsqueda desde el SearchBar
+  const handleSearch = (lat: number, lon: number, query: string) => {
     const map = mapRef.current as any;
-    if (!map || typeof fetch === "undefined") return;
-
-    const controller = new AbortController();
-    const q = searchQuery;
-    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1`;
-
-    fetch(url, { signal: controller.signal, headers: { "Accept-Language": "es" } })
-      .then((res) => res.json())
-      .then((results) => {
-        if (!results || results.length === 0) return;
-        const r = results[0];
-        const lat = parseFloat(r.lat);
-        const lon = parseFloat(r.lon);
-        if (Number.isFinite(lat) && Number.isFinite(lon)) {
-          try {
-            map.flyTo({ center: [lon, lat], zoom: 14, duration: 1400 });
-          } catch (e) {
-            // ignore
-          }
-        }
-      })
-      .catch(() => {});
-
-    return () => controller.abort();
-  }, [searchQuery]);
+    if (map) {
+      map.flyTo({ center: [lon, lat], zoom: 14, duration: 1400 });
+    }
+  };
 
   // compute visible mascotas based on map bounds
   useEffect(() => {
@@ -99,7 +75,6 @@ export default function MapWithSearch({
     map.on && map.on("moveend", updateVisible);
     map.on && map.on("load", updateVisible);
 
-    // initial
     updateVisible();
 
     return () => {
@@ -111,44 +86,24 @@ export default function MapWithSearch({
   return (
     <div>
       <div className="px-4 md:px-6 py-4">
-        <div className="max-w-[900px] mx-auto">
-          <div className="flex items-center gap-4 rounded-2xl border border-[#e5e7eb] bg-white/90 px-4 py-2 shadow-sm">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="7" cy="7" r="5.5" stroke="#8c7851" strokeWidth="1.5" />
-              <path d="M11.2 11.2L16 16" stroke="#8c7851" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-            <input
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  setSearchQuery(searchInput.trim() || undefined);
-                }
-              }}
-              className="w-full bg-transparent text-sm font-medium text-[#716040] placeholder:text-[#b7a888] focus:outline-none"
-              placeholder="Buscar zona, calle o ciudad... (Enter para buscar)"
-              type="search"
-            />
-          </div>
-        </div>
+        <SearchBar onSearch={handleSearch} />
       </div>
 
       <div className="h-[40vh] sm:h-[50vh] md:h-[60vh] lg:h-[75vh] xl:h-[80vh] w-full">
         <Map ref={mapRef} center={[-75.56843, 6.270]} zoom={11}>
           <MapControls position="bottom-right" showZoom showCompass showLocate showFullscreen />
 
-          {mascotas
-            .map((m) => {
-              const lng = toCoord(m.longitud);
-              const lat = toCoord(m.latitud);
-              if (typeof lng !== "number" || typeof lat !== "number") return null;
+          {mascotas.map((m) => {
+            const lng = toCoord(m.longitud);
+            const lat = toCoord(m.latitud);
+            if (typeof lng !== "number" || typeof lat !== "number") return null;
 
-              const thumbnailSrc = getThumbnail(m);
-              const originalSrc = getOriginal(m);
-              const markerSrc = thumbnailSrc || originalSrc || assets.max;
-              const borderColor = getBorderColor(m.estado);
+            const thumbnailSrc = getThumbnail(m);
+            const originalSrc = getOriginal(m);
+            const markerSrc = thumbnailSrc || originalSrc || assets.max;
+            const borderColor = getBorderColor(m.estado);
 
-              return (
+            return (
               <MapMarker key={m.id} longitude={lng} latitude={lat}>
                 <MarkerContent>
                   <div className={`size-6 rounded-full overflow-hidden border-2 ${borderColor} shadow-lg cursor-pointer hover:scale-110 transition-transform`}>
@@ -209,7 +164,7 @@ export default function MapWithSearch({
                 </MarkerPopup>
               </MapMarker>
             );
-            })}
+          })}
         </Map>
       </div>
     </div>
