@@ -133,7 +133,7 @@ export default function ReportModal({
             <div>
               <label className="block text-sm mb-1">Especifique el motivo (mínimo 5 caracteres)</label>
               <input
-                className="w-full rounded-md border p-2"
+                className="w-full border border-gray-200 bg-white rounded-lg p-3 mt-1 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300"
                 value={otherReason}
                 onChange={(e) => {
                   setOtherReason(e.target.value);
@@ -147,7 +147,7 @@ export default function ReportModal({
           <div>
             <label className="block text-sm mb-1">Descripción (opcional)</label>
             <textarea
-              className="w-full rounded-md border p-2"
+              className="w-full border border-gray-200 bg-white rounded-lg p-3 mt-1 shadow-sm transition-colors resize-none placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300"
               rows={4}
               value={description}
               onChange={(e) => setDescription(e.target.value)}

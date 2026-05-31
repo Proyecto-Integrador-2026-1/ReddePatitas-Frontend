@@ -14,7 +14,7 @@ export function Modal({ open, onClose, children }: { open: boolean; onClose: () 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative z-10 w-[90%] max-w-2xl rounded-2xl bg-white p-6 shadow-lg">
+      <div className="relative z-10 w-[90%] max-w-2xl max-h-[90vh] overflow-auto rounded-2xl bg-white p-6 shadow-lg">
         <button
           aria-label="Cerrar"
           onClick={onClose}

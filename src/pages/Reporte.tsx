@@ -374,7 +374,13 @@ export function Reportar() {
               <Controller
                 name="descripcion"
                 control={control}
-                render={({ field }) => <textarea rows={4} className="w-full rounded border p-2" {...field} />}
+                render={({ field }) => (
+                  <textarea
+                    rows={4}
+                    className="w-full border border-gray-200 bg-white rounded-lg p-3 shadow-sm transition-colors resize-none placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300"
+                    {...field}
+                  />
+                )}
               />
               {errors.descripcion && <p className="text-xs text-[#f25042]">{String(errors.descripcion?.message)}</p>}
             </div>
