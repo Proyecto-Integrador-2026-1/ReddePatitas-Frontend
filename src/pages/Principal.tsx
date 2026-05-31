@@ -216,64 +216,21 @@ export function Principal() {
     };
   }, [reportedVersion]);
 
-  // compute total unread messages across conversations (limited to first N to avoid heavy load)
-  const computeUnreadCount = async () => {
+  // Cargar total de mensajes no leídos (usando totalUnread del backend)
+  const loadUnreadCount = async () => {
     if (!isMounted.current) return;
     
     const userId = user?.id ?? null;
     if (!userId) return;
 
     try {
-      const resp = await messagingService
-        .listConversations(String(userId))
-        .catch(() => ({ conversations: [] as any[], totalUnread: 0 }));
-      
-      const convs: any[] = Array.isArray(resp?.conversations) ? resp.conversations : [];
-      
-      if (convs.length === 0) {
-        if (isMounted.current) setTotalUnread(0);
-        return;
+      const resp = await messagingService.listConversations(String(userId));
+      if (isMounted.current) {
+        setTotalUnread(resp.totalUnread);
       }
-      
-      const limit = 12;
-      const toCheck = convs.slice(0, limit);
-      const settled = await Promise.allSettled(
-        toCheck.map((c) => messagingService.getConversationMessages(
-          String(c.id || c.conversacionId || c.conversationId), 
-          String(userId)
-        ))
-      );
-      
-      let total = 0;
-      for (const s of settled) {
-        if (s.status !== 'fulfilled') continue;
-        const msgs = Array.isArray((s as any).value) ? (s as any).value : [];
-        const unread = msgs.filter((m: any) => {
-          const from = String(m.remitenteId || m.senderId || m.from || '').toLowerCase();
-          const mine = from === String(userId).toLowerCase();
-          if (mine) return false;
-          
-          const estado = String(m.estado || m.status || '').toLowerCase();
-          if (estado) {
-            const readStates = ['leido', 'visto', 'read', 'seen', 'readed'];
-            const unreadStates = ['enviado', 'sent', 'nuevo', 'new', 'unread'];
-            if (readStates.includes(estado)) return false;
-            if (unreadStates.includes(estado)) return true;
-          }
-          
-          const readFlag = m.leido ?? m.read ?? m.visto ?? null;
-          const readAt = m.readAt ?? m.leidoAt ?? m.leido_fecha ?? null;
-          if (readFlag !== null) return !Boolean(readFlag);
-          if (readAt) return false;
-          if (m.unread !== undefined) return Boolean(m.unread);
-          return true;
-        }).length;
-        total += unread;
-      }
-      
-      if (isMounted.current) setTotalUnread(total);
     } catch (e) {
-      console.error('Error computing unread count:', e);
+      console.error('Error loading unread count:', e);
+      if (isMounted.current) setTotalUnread(0);
     }
   };
 
@@ -282,41 +239,40 @@ export function Principal() {
     isMounted.current = true;
     
     // Cargar conteo inicial
-    computeUnreadCount();
+    loadUnreadCount();
     
-    // 👇 NUEVO: Escuchar eventos de actualización desde WebSocket
+    // Escuchar eventos de actualización desde WebSocket
     const handleRefreshUnread = () => {
       console.log('🔄 Actualizando badge de mensajes no leídos');
-      computeUnreadCount();
+      loadUnreadCount();
     };
     
     // Escuchar evento personalizado (disparado desde App.tsx)
     window.addEventListener('refresh-unread-count', handleRefreshUnread);
     
-    // También escuchar directamente las notificaciones WebSocket (alternativa)
+    // También escuchar directamente las notificaciones WebSocket
     const handleWebSocketNotification = (notification: any) => {
       if (notification.type === 'NEW_MESSAGE' || notification.type === 'MESSAGE_READ') {
         console.log(`📡 Notificación WebSocket: ${notification.type}, actualizando badge`);
-        computeUnreadCount();
+        loadUnreadCount();
       }
     };
     
     websocketService.on('NEW_MESSAGE', handleWebSocketNotification);
     websocketService.on('MESSAGE_READ', handleWebSocketNotification);
     
-    // ✅ Mantener polling solo como respaldo (cada 60 segundos en lugar de 30)
+    // Polling de respaldo (cada 60 segundos)
     const pollingInterval = setInterval(() => {
       console.log('🔄 Polling de respaldo para badge');
-      computeUnreadCount();
-    }, 60000); // 60 segundos
+      loadUnreadCount();
+    }, 60000);
     
     return () => {
       isMounted.current = false;
       window.removeEventListener('refresh-unread-count', handleRefreshUnread);
       websocketService.off('NEW_MESSAGE', handleWebSocketNotification);
       websocketService.off('MESSAGE_READ', handleWebSocketNotification);
-      if (pollingInterval) clearInterval(pollingInterval);
-      if (refreshTimeout.current) clearTimeout(refreshTimeout.current);
+      clearInterval(pollingInterval);
     };
   }, [user?.id]);
 

@@ -7,6 +7,7 @@ import { fetchMascotas } from '../services/principalService';
 import { Avatar, Button, Badge } from '../components/ui';
 import { normalizeImage, assets } from '../lib/imageUtils';
 import websocketService from '../services/websocketService';
+
 const API_BASE = (import.meta.env.VITE_API_URL as string) || 'http://localhost:8080';
 
 export default function MessagesPage() {
@@ -24,8 +25,9 @@ export default function MessagesPage() {
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const location = useLocation();
 
-
-    // Función para normalizar una conversación (reutilizable)
+  // ============================================
+  // Función para normalizar una conversación (reutilizable)
+  // ============================================
   const normalizeConversation = (c: any, reportsIndex: Record<string, any> | null, currentUserId: string) => {
     const id = c.id || c.userConversationId || c.user_conversation_id || c.userConversation?.id || '';
     const conversationId = c.conversationId || c.conversacionId || c.conversation?.id || '';
@@ -70,7 +72,9 @@ export default function MessagesPage() {
     };
   };
 
-    // Función para recargar conversaciones (reutilizable)
+  // ============================================
+  // Función para recargar conversaciones (reutilizable)
+  // ============================================
   const refreshConversations = async () => {
     if (!userId) return;
     try {
@@ -93,7 +97,7 @@ export default function MessagesPage() {
 
       const processedConvs = rawConvs.map((c: any) => normalizeConversation(c, reportsIndex, userId));
       setConversations(processedConvs);
-      
+
       // Actualizar conversación seleccionada si existe
       if (selectedConv) {
         const updated = processedConvs.find((c: any) => c.id === selectedConv.id);
@@ -104,7 +108,9 @@ export default function MessagesPage() {
     }
   };
 
+  // ============================================
   // Función para recargar mensajes de una conversación
+  // ============================================
   const refreshMessages = async (conversationId: string) => {
     if (!userId) return;
     try {
@@ -116,272 +122,45 @@ export default function MessagesPage() {
     }
   };
 
+  // ============================================
+  // Carga inicial de conversaciones (simplificado, reutiliza refreshConversations)
+  // ============================================
   useEffect(() => {
     if (!userId) return;
     let mounted = true;
+
     const load = async () => {
+      if (!mounted) return;
       setLoadingConvs(true);
-      try {
-        const resp = await messagingService.listConversations(userId);
-        if (!mounted) return;
-
-        const rawConvs = Array.isArray(resp?.conversations) ? resp.conversations : [];
-
-        let reportsIndex: Record<string, any> | null = null;
-        try {
-          const list = await fetchMascotas();
-          if (Array.isArray(list)) {
-            reportsIndex = list.reduce((acc: Record<string, any>, r: any) => {
-              if (r && r.id) acc[String(r.id)] = r;
-              return acc;
-            }, {});
-          }
-        } catch (e) {
-          reportsIndex = null;
-        }
-
-        const norm = rawConvs.map((c: any) => {
-          const id =
-            c.id ||
-            c.userConversationId ||
-            c.user_conversation_id ||
-            c.userConversation?.id ||
-            '';
-
-          const conversationId =
-            c.conversationId ||
-            c.conversacionId ||
-            c.conversation?.id ||
-            '';
-
-          const reportCandidateId = c.report?.id || c.reportId || null;
-          const reportEntry = reportCandidateId && reportsIndex ? reportsIndex[reportCandidateId] : null;
-
-          const mascotaName =
-            reportEntry?.nombre ||
-            reportEntry?.pet?.nombre ||
-            c?.mascota?.nombre ||
-            c.mascotaName ||
-            'Mascota sin nombre';
-
-          const rawThumbCandidates = [
-            reportEntry?.thumbnail_url,
-            reportEntry?.imagen_url,
-            reportEntry?.imagen,
-            reportEntry?.image,
-            c.mascota?.thumbnail_url,
-            c.mascota?.imagen_url,
-            c.thumbnail,
-            c.report?.pet?.thumbnail_url,
-            c.report?.pet?.imagen_url,
-          ];
-          const rawThumb = rawThumbCandidates.find(Boolean) || '';
-          let thumbnail = normalizeImage(rawThumb);
-          if (!rawThumb || thumbnail === assets.max) thumbnail = assets.max;
-
-          // determine owner/publisher ids and pet/report id
-          const rawOwner =
-            c.otherUserId ??
-            c.ownerId ??
-            (c.owner && (c.owner.id ?? c.owner)) ??
-            c.publicadorId ??
-            (c.publicador && (c.publicador.id ?? c.publicador)) ??
-            c.publisherId ??
-            (c.publisher && (c.publisher.id ?? c.publisher)) ??
-            c.usuarioId ??
-            c.userId ??
-            null;
-          const ownerIdStr = rawOwner != null ? String(rawOwner) : null;
-          const rawUser2 = c.userId2 || c.user2 || null;
-          const user2Str = rawUser2 ? String(rawUser2) : null;
-          const normalizedOwner = ownerIdStr ? String(ownerIdStr).toLowerCase().trim() : null;
-          const normalizedUser = user?.id ? String(user.id).toLowerCase().trim() : null;
-          const publisherId = (normalizedOwner && normalizedUser && normalizedOwner === normalizedUser && user2Str)
-            ? user2Str
-            : (ownerIdStr || c.publisherId || c.publicadorId || c.otherUserId || '');
-          const publisherName = c.otherUserName || c.publisher?.displayName || c.publisherName || '';
-          const petId = reportCandidateId || c.petId || c.mascotaId || c.reportId || (c.report && c.report.id) || null;
-
-          const lastMessage = c.lastMessage || c.ultimoMensaje || c.last || null;
-          const unreadCount = Number(c.unreadCount ?? c.unread ?? 0);
-
-          return {
-            ...c,
-            id: String(id),
-            conversationId: String(conversationId || ''),
-            mascotaName,
-            thumbnail,
-            publisherId,
-            publisherName,
-            lastMessage,
-            unreadCount,
-            reportId: reportCandidateId,
-            ownerId: ownerIdStr,
-            petId,
-          };
-        });
-        setConversations(norm);
-
-        (async () => {
-          try {
-            const limit = 12;
-            const toCheck = norm.slice(0, limit);
-            const results = await Promise.allSettled(
-              toCheck.map((cv: any) =>
-                messagingService.getConversationMessages(String(cv.id), userId)
-              )
-            );
-            const updates: Record<string, number> = {};
-            results.forEach((r, i) => {
-              if (r.status !== 'fulfilled' || !Array.isArray((r as any).value)) return;
-              const msgs: any[] = (r as any).value;
-              const unread = msgs.filter((m: any) => {
-                const from = String(m.remitenteId || m.senderId || m.from || '').toLowerCase();
-                const mine = from === String(userId).toLowerCase();
-                if (mine) return false;
-
-                const estado = String(m.estado || m.status || '').toLowerCase();
-                if (estado) {
-                  const readStates = ['leido', 'visto', 'read', 'seen', 'readed'];
-                  const unreadStates = ['enviado', 'sent', 'nuevo', 'new', 'unread', 'no-leido', 'no_leido'];
-                  if (readStates.includes(estado)) return false;
-                  if (unreadStates.includes(estado)) return true;
-                }
-
-                const readFlag = m.leido ?? m.read ?? m.visto ?? null;
-                const readAt = m.readAt ?? m.leidoAt ?? m.leido_fecha ?? null;
-                if (readFlag !== null) return !Boolean(readFlag);
-                if (readAt) return false;
-
-                if (m.unread !== undefined) return Boolean(m.unread);
-                return true;
-              }).length;
-              if (unread > 0) updates[String(toCheck[i].id)] = unread;
-            });
-            if (Object.keys(updates).length) {
-              setConversations((prev) =>
-                prev.map((p: any) => ({
-                  ...p,
-                  unreadCount: updates[String(p.id)] || p.unreadCount || 0,
-                }))
-              );
-            }
-          } catch (e) {}
-        })();
-
-        (async () => {
-          for (const conv of norm) {
-            const petCandidates = [
-              conv.mascota?.id,
-              conv.report?.pet?.id,
-              conv.report?.mascota?.id,
-              conv.report?.pet?.id,
-              conv.reportId,
-              conv.report?.id,
-              conv.petId,
-              conv.mascotaId,
-            ].filter(Boolean);
-
-            if ((!conv.mascotaName || conv.mascotaName === 'Mascota sin nombre') && petCandidates.length) {
-              const reportCandidateId = conv.report?.id || conv.reportId || null;
-              if (reportCandidateId && reportsIndex && reportsIndex[reportCandidateId]) {
-                const rep = reportsIndex[reportCandidateId];
-                const petNameFromRep = rep?.nombre || rep?.pet?.nombre || rep?.mascota?.nombre || null;
-                const petImgFromRep = rep?.thumbnail_url || rep?.imagen_url || rep?.imagen || rep?.image || rep?.pet?.thumbnail_url || rep?.pet?.imagen_url || null;
-                if (petNameFromRep) {
-                  setConversations((prev) => prev.map((p: any) => (p.id === conv.id ? { ...p, mascotaName: petNameFromRep } : p)));
-                  if (selectedConv?.id === conv.id) setSelectedConv((s: any) => (s ? { ...s, mascotaName: petNameFromRep } : s));
-                }
-                if (petImgFromRep) {
-                  const thumb = normalizeImage(petImgFromRep);
-                  setConversations((prev) => prev.map((p: any) => (p.id === conv.id ? { ...p, thumbnail: thumb } : p)));
-                  if (selectedConv?.id === conv.id) setSelectedConv((s: any) => (s ? { ...s, thumbnail: thumb } : s));
-                }
-                if (petNameFromRep || petImgFromRep) continue;
-              }
-
-              for (const pid of petCandidates) {
-                try {
-                  const r = await fetch(`${API_BASE}/api/reports/${pid}`);
-                  if (!r.ok) continue;
-                  const body = await r.json().catch(() => null);
-                  const petName = body?.nombre || body?.mascota?.nombre || body?.pet?.nombre || null;
-                  const petImg = body?.imagen_url || body?.thumbnail_url || body?.image || body?.foto || body?.fotoUrl || body?.imageUrl || body?.imagen || (body?.mascota && (body.mascota.imagen_url || body.mascota.thumbnail_url || body.mascota.image)) || null;
-
-                  let updated = false;
-                  if (petName) {
-                    setConversations((prev) => prev.map((p: any) => (p.id === conv.id ? { ...p, mascotaName: petName } : p)));
-                    if (selectedConv?.id === conv.id) setSelectedConv((s: any) => (s ? { ...s, mascotaName: petName } : s));
-                    updated = true;
-                  }
-                  if (petImg) {
-                    const thumb = normalizeImage(petImg);
-                    setConversations((prev) => prev.map((p: any) => (p.id === conv.id ? { ...p, thumbnail: thumb } : p)));
-                    if (selectedConv?.id === conv.id) setSelectedConv((s: any) => (s ? { ...s, thumbnail: thumb } : s));
-                    updated = true;
-                  }
-                  if (updated) break;
-                } catch (e) {}
-              }
-            }
-
-            if ((!conv.publisherName || conv.publisherName.length === 0)) {
-              const other = (conv.participants && Array.isArray(conv.participants) && conv.participants.find((p: any) => String(p.id) !== String(userId))) || conv.owner || conv.publicador || conv.publisher || null;
-              const fromOther = other ? (other.nombre || other.username || other.userName || null) : null;
-              if (fromOther) {
-                setConversations((prev) => prev.map((p: any) => (p.id === conv.id ? { ...p, publisherName: fromOther } : p)));
-                if (selectedConv?.id === conv.id) setSelectedConv((s: any) => (s ? { ...s, publisherName: fromOther } : s));
-              } else {
-                const pid = conv.publisherId || conv.ownerId || conv.publicadorId || (other && other.id) || null;
-                const normPid = pid ? String(pid).toLowerCase().trim() : null;
-                const normUser = user?.id ? String(user.id).toLowerCase().trim() : null;
-                if (pid && normPid && normUser && normPid === normUser) {
-                  const selfName = user?.username || (user as any)?.nombre || null;
-                  if (selfName) {
-                    setConversations((prev) => prev.map((p: any) => (p.id === conv.id ? { ...p, publisherName: selfName } : p)));
-                    if (selectedConv?.id === conv.id) setSelectedConv((s: any) => (s ? { ...s, publisherName: selfName } : s));
-                  }
-                } else {
-                  const fallback = pid ? `Usuario ${String(pid).slice(0, 8)}` : '';
-                  if (fallback) {
-                    setConversations((prev) => prev.map((p: any) => (p.id === conv.id ? { ...p, publisherName: fallback } : p)));
-                    if (selectedConv?.id === conv.id) setSelectedConv((s: any) => (s ? { ...s, publisherName: fallback } : s));
-                  }
-                }
-              }
-            }
-          }
-        })();
-
-        const selId = (location.state as any)?.selectedConversationId;
-        if (selId) {
-          const found = norm.find((c: any) => String(c.id) === String(selId));
-          if (found) setSelectedConv(found);
-        }
-      } catch (err) {
-        console.error('Error cargando conversaciones', err);
-      } finally {
-        setLoadingConvs(false);
-      }
+      await refreshConversations();
+      setLoadingConvs(false);
     };
+
     load();
 
-    const iv = setInterval(load, 60000);
-    return () => { mounted = false; clearInterval(iv); };
+    const iv = setInterval(() => {
+      if (mounted) refreshConversations();
+    }, 60000);
+
+    return () => {
+      mounted = false;
+      clearInterval(iv);
+    };
   }, [userId]);
 
-
+  // ============================================
   // Escuchar eventos WebSocket para actualizar conversaciones y mensajes en tiempo real
+  // ============================================
   useEffect(() => {
     if (!userId) return;
 
     // Handler para nuevo mensaje
     const handleNewMessage = (notification: any) => {
       console.log('📨 Bandeja: Nuevo mensaje recibido', notification);
-      
+
       // Actualizar lista de conversaciones (recargar)
       refreshConversations();
-      
+
       // Si la conversación activa es la que recibió el mensaje, recargar mensajes
       if (selectedConv && notification.userConversationId === selectedConv.id) {
         refreshMessages(selectedConv.id);
@@ -398,7 +177,7 @@ export default function MessagesPage() {
     const handleConversationDeleted = (notification: any) => {
       console.log('🗑️ Bandeja: Conversación eliminada', notification);
       refreshConversations();
-      
+
       // Si la conversación eliminada era la seleccionada, cerrarla
       if (selectedConv && notification.userConversationId === selectedConv.id) {
         setSelectedConv(null);
@@ -418,10 +197,13 @@ export default function MessagesPage() {
     };
   }, [userId, selectedConv]);
 
-
+  // ============================================
+  // Cargar mensajes cuando se selecciona una conversación
+  // ============================================
   useEffect(() => {
     if (!selectedConv) return;
     let mounted = true;
+
     const loadMsgs = async () => {
       setLoadingMsgs(true);
       try {
@@ -435,12 +217,20 @@ export default function MessagesPage() {
         setLoadingMsgs(false);
         setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
       }
-      (async () => { try { await messagingService.markConversationAsRead(selectedConv.id, userId); } catch (e) {} })();
+      (async () => {
+        try {
+          await messagingService.markConversationAsRead(selectedConv.id, userId);
+        } catch (e) {}
+      })();
     };
+
     loadMsgs();
 
     const iv = setInterval(loadMsgs, 30000);
-    return () => { mounted = false; clearInterval(iv); };
+    return () => {
+      mounted = false;
+      clearInterval(iv);
+    };
   }, [selectedConv, userId]);
 
   const selectConv = (conv: any) => {
@@ -499,7 +289,7 @@ export default function MessagesPage() {
     return 'Nombre no disponible';
   };
 
-    return (
+  return (
     <div className="min-h-screen bg-[#f5f1ea] p-4 sm:p-6">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-4">
         <div className="flex items-center justify-between">
@@ -542,13 +332,9 @@ export default function MessagesPage() {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between">
                             <span className="truncate text-sm font-semibold text-[#020826]">{name}</span>
-                            {badge > 0 && (
-                              <Badge className="bg-[#8c7851] text-white">{badge}</Badge>
-                            )}
+                            {badge > 0 && <Badge className="bg-[#8c7851] text-white">{badge}</Badge>}
                           </div>
-                          <div className="truncate text-xs text-[#716040]">
-                            {conv.mascotaName || 'Mascota sin nombre'}
-                          </div>
+                          <div className="truncate text-xs text-[#716040]">{conv.mascotaName || 'Mascota sin nombre'}</div>
                         </div>
                       </button>
 
@@ -611,9 +397,7 @@ export default function MessagesPage() {
                         <div key={msg.id || idx} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
                           <div
                             className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${
-                              isMine
-                                ? 'bg-[#020826] text-white'
-                                : 'bg-[#f9f4ef] text-[#020826]'
+                              isMine ? 'bg-[#020826] text-white' : 'bg-[#f9f4ef] text-[#020826]'
                             }`}
                           >
                             {msg.content || msg.contenido || msg.texto || msg.body || ''}
