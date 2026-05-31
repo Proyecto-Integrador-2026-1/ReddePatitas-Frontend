@@ -527,11 +527,11 @@ export function PrincipalModal({
                 <Label htmlFor="contactMessage">Mensaje</Label>
                 <textarea
                   id="contactMessage"
-                  className="w-full mt-2 rounded-md border p-3 text-sm"
                   rows={6}
                   placeholder="Escribe tu mensaje aquí"
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
+                  className="w-full border border-gray-200 bg-white rounded-lg p-3 mt-2 mb-2 shadow-sm transition-colors resize-none placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300"
                 />
                 <div className="flex mt-3 justify-end gap-2">
                   <Button

@@ -18,6 +18,7 @@ export default function Dashboard() {
   const [selected, setSelected] = useState<Mascota | null>(null);
   const [selectedIsResolved, setSelectedIsResolved] = useState(false);
   const [metrics, setMetrics] = useState<Record<string, any> | null>(null);
+  const [userMetrics, setUserMetrics] = useState<Record<string, any> | null>(null);
   const [reported, setReported] = useState<any[]>([]);
   const [hiddenList, setHiddenList] = useState<any[]>([]);
   const [deletedList, setDeletedList] = useState<any[]>([]);
@@ -25,6 +26,7 @@ export default function Dashboard() {
   const [loadingHidden, setLoadingHidden] = useState(false);
   const [loadingDeleted, setLoadingDeleted] = useState(false);
   const [loadingMetrics, setLoadingMetrics] = useState(false);
+  const [loadingUserMetrics, setLoadingUserMetrics] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
   const [restoreOpen, setRestoreOpen] = useState(false);
@@ -36,6 +38,12 @@ export default function Dashboard() {
   const [confirmPayload, setConfirmPayload] = useState<any | null>(null);
   const [confirmMotivo, setConfirmMotivo] = useState('');
   const [confirmLoading, setConfirmLoading] = useState(false);
+  const [userActionsOpen, setUserActionsOpen] = useState(false);
+  const [userActionsPayload, setUserActionsPayload] = useState<any | null>(null);
+  const [userActionsMotivo, setUserActionsMotivo] = useState('');
+  const [userActionsLoading, setUserActionsLoading] = useState(false);
+  const [userActionConfirmOpen, setUserActionConfirmOpen] = useState(false);
+  const [userActionToPerform, setUserActionToPerform] = useState<'block' | 'unblock' | 'deactivate' | 'activate' | null>(null);
   const [flashMessage, setFlashMessage] = useState<string | null>(null);
   const [userReported, setUserReported] = useState<any[]>([]);
   const [userHidden, setUserHidden] = useState<any[]>([]);
@@ -48,6 +56,31 @@ export default function Dashboard() {
       if (obj[k] !== undefined && obj[k] !== null) return obj[k];
     }
     return undefined;
+  }
+
+  function petNameOrSinNombre(item: any) {
+    const n = String(item?.petName ?? item?.pet_name ?? item?.nombre ?? item?.nombreMascota ?? item?.nombre_mascota ?? item?.name ?? item?.title ?? '').trim();
+    return n || 'sin nombre';
+  }
+
+  async function performUserAction(action: 'block' | 'unblock' | 'deactivate' | 'activate') {
+    if (!userActionsPayload) return;
+    const ownerId = String(userActionsPayload.ownerId);
+    setUserActionsLoading(true);
+    try {
+      if (action === 'block') await adminService.blockUser(ownerId, userActionsMotivo || '');
+      if (action === 'unblock') await adminService.unblockUser(ownerId, userActionsMotivo || '');
+      if (action === 'deactivate') await adminService.deactivateUser(ownerId, userActionsMotivo || '');
+      if (action === 'activate') await adminService.activateUser(ownerId, userActionsMotivo || '');
+      setFlashMessage(`Acción ${action} ejecutada`);
+      setUserActionsOpen(false);
+    } catch (e) {
+      setFlashMessage(String(e));
+    } finally {
+      setUserActionsLoading(false);
+      setUserActionsMotivo('');
+      setUserActionsPayload(null);
+    }
   }
 
   useEffect(() => {
@@ -91,6 +124,13 @@ export default function Dashboard() {
         .then(list => { if (!mounted) return; setDeletedList(Array.isArray(list) ? list : []); })
         .catch(() => {})
         .finally(() => { if (!mounted) return; setLoadingDeleted(false); });
+
+      // load user metrics
+      setLoadingUserMetrics(true);
+      adminService.getUserMetrics(String(user.id))
+        .then(m => { if (!mounted) return; setUserMetrics(m || null); })
+        .catch(() => {})
+        .finally(() => { if (!mounted) return; setLoadingUserMetrics(false); });
     }
 
     return () => { mounted = false; };
@@ -137,7 +177,7 @@ export default function Dashboard() {
                   <div className="flex gap-3 items-start">
                     <img src={normalizeImage(r.thumbnailUrl ?? r.thumbnail_url ?? r.imagenUrl ?? r.imagen_url ?? '')} alt="mini" className="h-12 w-12 sm:h-16 sm:w-16 rounded object-cover flex-shrink-0" />
                     <div className="flex-1">
-                      <div className="text-sm font-medium">{r.petName ?? r.nombre ?? r.name ?? `Publicación ${String(r.petId ?? r.pet_id ?? '')}`}</div>
+                      <div className="text-sm font-medium">{petNameOrSinNombre(r)}</div>
                       {r.fechaCreacion && <div className="text-xs text-muted-foreground">{new Date(r.fechaCreacion).toLocaleString()}</div>}
                     </div>
                   </div>
@@ -151,17 +191,22 @@ export default function Dashboard() {
           <div className="mt-4">
             <h4 className="text-md font-semibold mb-2">Mis publicaciones ocultas</h4>
             <div className="space-y-2">
-              {userHidden.map((h: any, idx) => (
-                <Card key={idx} className="p-3">
-                  <div className="flex gap-3 items-start">
-                    <img src={normalizeImage(h.thumbnailUrl ?? h.thumbnail_url ?? h.imagenUrl ?? h.imagen_url ?? h.image ?? '')} alt="mini" className="h-12 w-12 sm:h-16 sm:w-16 rounded object-cover flex-shrink-0" />
-                    <div className="flex-1">
-                      <div className="text-sm font-medium">{h.petName ?? h.nombre ?? h.name ?? `Publicación ${String(h.petId ?? h.pet_id ?? '')}`}</div>
-                      {h.fechaCreacion && <div className="text-xs text-muted-foreground">{new Date(h.fechaCreacion).toLocaleString()}</div>}
+              {userHidden.map((h: any, idx) => {
+                const tipoRaw = String(h.tipoReporte ?? h.tipo_reporte ?? h.tipo ?? '').toLowerCase();
+                const tipoLabel = tipoRaw.includes('perd') ? 'PERDIDO' : (tipoRaw.includes('encon') || tipoRaw.includes('encontr') ? 'ENCONTRADO' : '');
+                return (
+                  <Card key={idx} className="p-3">
+                    <div className="flex gap-3 items-start">
+                      <img src={normalizeImage(h.thumbnailUrl ?? h.thumbnail_url ?? h.imagenUrl ?? h.imagen_url ?? h.image ?? '')} alt="mini" className="h-12 w-12 sm:h-16 sm:w-16 rounded object-cover flex-shrink-0" />
+                      <div className="flex-1">
+                        <div className="text-sm font-medium">{petNameOrSinNombre(h)}</div>
+                        {tipoLabel && <div className="text-xs text-muted-foreground">Tipo: <span className="font-medium">{tipoLabel}</span></div>}
+                        {h.fechaCreacion && <div className="text-xs text-muted-foreground">{new Date(h.fechaCreacion).toLocaleString()}</div>}
+                      </div>
                     </div>
-                  </div>
-                </Card>
-              ))}
+                  </Card>
+                );
+              })}
             </div>
           </div>
         )}
@@ -170,17 +215,22 @@ export default function Dashboard() {
           <div className="mt-4">
             <h4 className="text-md font-semibold mb-2">Mis publicaciones eliminadas</h4>
             <div className="space-y-2">
-              {userDeleted.map((d: any, idx) => (
-                <Card key={idx} className="p-3">
-                  <div className="flex gap-3 items-start">
-                    <img src={normalizeImage(d.thumbnailUrl ?? d.thumbnail_url ?? d.imagenUrl ?? d.imagen_url ?? d.image ?? '')} alt="mini" className="h-12 w-12 sm:h-16 sm:w-16 rounded object-cover flex-shrink-0" />
-                    <div className="flex-1">
-                      <div className="text-sm font-medium">{d.petName ?? d.nombre ?? d.name ?? `Publicación ${String(d.petId ?? d.pet_id ?? '')}`}</div>
-                      {d.fechaCreacion && <div className="text-xs text-muted-foreground">{new Date(d.fechaCreacion).toLocaleString()}</div>}
+              {userDeleted.map((d: any, idx) => {
+                const tipoRaw = String(d.tipoReporte ?? d.tipo_reporte ?? d.tipo ?? '').toLowerCase();
+                const tipoLabel = tipoRaw.includes('perd') ? 'PERDIDO' : (tipoRaw.includes('encon') || tipoRaw.includes('encontr') ? 'ENCONTRADO' : '');
+                return (
+                  <Card key={idx} className="p-3">
+                    <div className="flex gap-3 items-start">
+                      <img src={normalizeImage(d.thumbnailUrl ?? d.thumbnail_url ?? d.imagenUrl ?? d.imagen_url ?? d.image ?? '')} alt="mini" className="h-12 w-12 sm:h-16 sm:w-16 rounded object-cover flex-shrink-0" />
+                      <div className="flex-1">
+                        <div className="text-sm font-medium">{petNameOrSinNombre(d)}</div>
+                        {tipoLabel && <div className="text-xs text-muted-foreground">Tipo: <span className="font-medium">{tipoLabel}</span></div>}
+                        {d.fechaCreacion && <div className="text-xs text-muted-foreground">{new Date(d.fechaCreacion).toLocaleString()}</div>}
+                      </div>
                     </div>
-                  </div>
-                </Card>
-              ))}
+                  </Card>
+                );
+              })}
             </div>
           </div>
         )}
@@ -214,7 +264,7 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-[#f5f1ea] text-[#020826] p-4 sm:p-6">
       <div className="mx-auto max-w-screen-xl">
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#020826] text-white">
               <img src="/assets/huellas.svg" alt="logo" className="h-6 w-6" />
@@ -238,7 +288,7 @@ export default function Dashboard() {
         </div>
         {isAdmin && (
           <div className="mb-6">
-            <h3 className="text-lg font-bold mb-3">Métricas de administración</h3>
+            <h3 className="text-lg font-bold mb-3">Métricas de reportes</h3>
             <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
               <div className="p-4 rounded-lg bg-white shadow flex flex-col items-center justify-center text-center border border-red-200">
                 <div className="text-sm text-muted-foreground text-center font-bold">Publicaciones Reportadas</div>
@@ -270,6 +320,30 @@ export default function Dashboard() {
                 <div className="text-sm text-amber-600 mt-2">Histórico de publicaciones eliminadas</div>
               </div>
             </div>
+
+            <div className="mt-4">
+              <h4 className="text-lg font-bold mb-3">Métricas de usuarios</h4>
+              <div className="text-xs text-muted-foreground mb-2">{loadingUserMetrics ? 'Cargando métricas de usuario...' : (userMetrics ? 'Métricas cargadas' : 'Sin métricas de usuario disponibles')}</div>
+              <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
+                <div className="p-4 rounded-lg bg-white shadow flex flex-col items-center justify-center text-center border border-gray-200">
+                  <div className="text-sm text-muted-foreground text-center font-bold">Total Usuarios</div>
+                  <div className="text-2xl font-bold text-center">{loadingUserMetrics ? '—' : (readMetric(userMetrics, ['totalUsers','total_Users']) ?? '0')}</div>
+                </div>
+                <div className="p-4 rounded-lg bg-white shadow flex flex-col items-center justify-center text-center">
+                  <div className="text-sm text-muted-foreground text-center font-bold">Usuarios Activos</div>
+                  <div className="text-2xl font-bold text-center">{loadingUserMetrics ? '—' : (readMetric(userMetrics, ['totalActive','total_Active']) ?? '0')}</div>
+                </div>
+                <div className="p-4 rounded-lg bg-white shadow flex flex-col items-center justify-center text-center">
+                  <div className="text-sm text-muted-foreground text-center font-bold">Usuarios Bloqueados</div>
+                  <div className="text-2xl font-bold text-center text-red-600">{loadingUserMetrics ? '—' : (readMetric(userMetrics, ['totalBlocked','total_Blocked']) ?? '0')}</div>
+                </div>
+                <div className="p-4 rounded-lg bg-white shadow flex flex-col items-center justify-center text-center">
+                  <div className="text-sm text-muted-foreground text-center font-bold">Usuarios Desactivados</div>
+                  <div className="text-2xl font-bold text-center">{loadingUserMetrics ? '—' : (readMetric(userMetrics, ['totalDeactivated','total_Deactivated']) ?? '0')}</div>
+                </div>
+              </div>
+            </div>
+
           </div>
         )}
        <div className="mb-6">
@@ -344,8 +418,8 @@ export default function Dashboard() {
                           }}>Ignorar</button>
                           <button className="px-3 py-1 bg-pink-100 rounded" onClick={() => {
                             if (!ownerId) { setFlashMessage('No se conoce el usuario propietario'); return; }
-                            setConfirmType('bloquear'); setConfirmPayload({ ownerId, userId: String(user?.id) }); setConfirmMotivo(''); setConfirmOpen(true);
-                          }}>Bloquear usuario</button>
+                            setUserActionsPayload({ ownerId, userId: String(user?.id) }); setUserActionsMotivo(''); setUserActionsOpen(true);
+                          }}>Acciones sobre el usuario</button>
                         </div>
                       </Card>
                     );
@@ -401,6 +475,8 @@ export default function Dashboard() {
                       const title = h.petName ?? h.nombre ?? h.nombreMascota ?? h.name ?? `Publicación ${String(h.petId ?? h.pet_id ?? '')}`;
                       const pub = h.publisherName ?? h.publisher_name ?? h.publisher ?? '—';
                       const time = h.fechaCreacion ?? h.fecha_creacion ?? h.createdAt ?? h.created_at ?? '';
+                      const tipoRaw = String(h.tipoReporte ?? h.tipo_reporte ?? h.tipo ?? '').toLowerCase();
+                      const tipoLabel = tipoRaw.includes('perd') ? 'PERDIDO' : (tipoRaw.includes('encon') || tipoRaw.includes('encontr') ? 'ENCONTRADO' : '');
                       return (
                         <Card
                           key={String(h.reportId ?? h.id ?? h.report_id ?? h.publicationId ?? h.id)}
@@ -410,6 +486,7 @@ export default function Dashboard() {
                           <img src={thumb} alt="miniatura" className="h-16 w-16 rounded-lg object-cover flex-shrink-0" />
                           <div className="flex-1">
                             <div className="text-sm font-medium">{title}</div>
+                            {tipoLabel && <div className="text-xs text-muted-foreground">Tipo: <span className="font-medium">{tipoLabel}</span></div>}
                             <div className="text-xs text-muted-foreground">Publicado por: <span className="font-medium">{pub}</span></div>
                             {time && <div className="text-xs text-muted-foreground">{new Date(time).toLocaleString()}</div>}
                           </div>
@@ -458,11 +535,14 @@ export default function Dashboard() {
                       const title = d.petName ?? d.nombre ?? d.nombreMascota ?? d.name ?? `Publicación ${String(d.petId ?? d.pet_id ?? '')}`;
                       const pub = d.publisherName ?? d.publisher_name ?? d.publisher ?? '—';
                       const time = d.fechaCreacion ?? d.fecha_creacion ?? d.createdAt ?? d.created_at ?? '';
+                      const tipoRaw = String(d.tipoReporte ?? d.tipo_reporte ?? d.tipo ?? '').toLowerCase();
+                      const tipoLabel = tipoRaw.includes('perd') ? 'PERDIDO' : (tipoRaw.includes('encon') || tipoRaw.includes('encontr') ? 'ENCONTRADO' : '');
                       return (
                         <Card key={String(d.reportId ?? d.id ?? d.report_id ?? d.publicationId ?? d.id)} className="p-3 flex gap-3 items-start">
                           <img src={thumb} alt="miniatura" className="h-16 w-16 rounded-lg object-cover flex-shrink-0" />
                           <div className="flex-1">
                             <div className="text-sm font-medium">{title}</div>
+                            {tipoLabel && <div className="text-xs text-muted-foreground">Tipo: <span className="font-medium">{tipoLabel}</span></div>}
                             <div className="text-xs text-muted-foreground">Publicado por: <span className="font-medium">{pub}</span></div>
                             {time && <div className="text-xs text-muted-foreground">{new Date(time).toLocaleString()}</div>}
                           </div>
@@ -494,16 +574,26 @@ export default function Dashboard() {
                     const fecha = h.creadoEn ?? h.creado_en ?? h.creado ?? h.createdAt ?? h.created_at ?? null;
                     const fechaObj = fecha ? new Date(fecha) : null;
                     const fechaStr = fechaObj ? fechaObj.toLocaleString('es-AR', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) : '—';
-                    const quien = String(h.realizadoPor ?? h.realizado_por ?? h.actor ?? h.user ?? '—');
+                    const quien = String(h.realizadoPorNombre ?? h.realizado_por ?? h.actor ?? h.user ?? '—');
                     const objetivo = String(h.idObjetivo ?? h.id_objetivo ?? h.idObjetiv ?? h.targetId ?? h.id ?? '—');
                     const motivo = h.motivo ?? h.reason ?? h.detail ?? '';
-                    const color = tipo.toLowerCase().includes('elim') ? 'bg-red-100 text-red-800' : tipo.toLowerCase().includes('ocult') ? 'bg-yellow-100 text-yellow-800' : tipo.toLowerCase().includes('restaur') ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800';
+                    const l = tipo.toLowerCase();
+                    let color = 'bg-gray-100 text-gray-800';
+                    // report-related colors
+                    if (l.includes('elim')) color = 'bg-red-100 text-red-800';
+                    else if (l.includes('ocult')) color = 'bg-yellow-100 text-yellow-800';
+                    else if (l.includes('restaur')) color = 'bg-green-100 text-green-800';
+                    // user-related actions: check 'desbloq/unblock' before 'bloque/block' to avoid substring collisions
+                    else if (l.includes('desbloq') || l.includes('unblock')) color = 'bg-green-100 text-green-800';
+                    else if (l.includes('bloque') || l.includes('block')) color = 'bg-red-100 text-red-800';
+                    else if (l.includes('desactiv') || l.includes('deactiv')) color = 'bg-yellow-100 text-yellow-800';
+                    else if (l.includes('activ') || l.includes('activate')) color = 'bg-green-100 text-green-800';
                     return (
                       <li key={idx}>
-                        <div className="bg-white p-3 rounded shadow-sm border flex flex-col sm:flex-row sm:items-center gap-4">
+                        <div className="bg-white p-3 rounded-lg border border-gray-200 shadow-lg ring-1 ring-gray-100 hover:shadow-2xl transition-shadow flex flex-col sm:flex-row sm:items-center gap-4">
                           <div className="sm:w-36 w-full text-sm text-muted-foreground sm:text-right text-left whitespace-nowrap">{fechaStr}</div>
                           <div className="flex-1">
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center justify-start gap-6">
                               <div className="flex items-center gap-3">
                                 <div className={`px-2 py-1 rounded-full text-sm font-semibold ${color}`}>{tipo}</div>
                               </div>
@@ -529,7 +619,7 @@ export default function Dashboard() {
             <h4 className="font-bold mb-2">Restaurar publicación</h4>
             <div className="mb-2 text-sm">¿Está seguro de restaurar la publicación?</div>
             <label className="text-xs text-muted-foreground">Motivo (opcional)</label>
-            <textarea value={restoreMotivo} onChange={(e) => setRestoreMotivo(e.target.value)} className="w-full border rounded p-2 mt-1 mb-3" rows={3} />
+            <textarea value={restoreMotivo} onChange={(e) => setRestoreMotivo(e.target.value)} rows={3} className="w-full border border-gray-200 bg-white rounded-lg p-3 mt-1 mb-3 shadow-sm transition-colors resize-none placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300" />
             <div className="flex gap-2 justify-end">
               <button className="px-3 py-1 bg-white border rounded" onClick={() => setRestoreOpen(false)} disabled={restoring}>Cancelar</button>
               <button className="px-3 py-1 bg-green-100 rounded" onClick={async () => {
@@ -552,6 +642,44 @@ export default function Dashboard() {
         ) : null}
       </Modal>
 
+      {/* Modal para acciones sobre el usuario (bloquear/desbloquear/desactivar/activar) */}
+      <Modal open={userActionsOpen} onClose={() => { if (!userActionsLoading) setUserActionsOpen(false); }}>
+        <div>
+          <h4 className="font-bold mb-2">Acciones sobre el usuario</h4>
+          <div className="mb-3 text-sm text-muted-foreground">Seleccione una acción a realizar sobre el usuario. Puede indicar un motivo (opcional).</div>
+          <textarea value={userActionsMotivo} onChange={(e) => setUserActionsMotivo(e.target.value)} rows={3} placeholder="Motivo (opcional)" className="w-full border border-gray-200 bg-white rounded-lg p-3 mt-1 mb-3 shadow-sm transition-colors resize-none placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300" />
+          <div className="flex gap-2 justify-end flex-wrap">
+            <button className="px-3 py-1 bg-red-100 rounded" onClick={() => { setUserActionToPerform('block'); setUserActionConfirmOpen(true); }} disabled={userActionsLoading}>Bloquear</button>
+            <button className="px-3 py-1 bg-green-100 rounded" onClick={() => { setUserActionToPerform('unblock'); setUserActionConfirmOpen(true); }} disabled={userActionsLoading}>Desbloquear</button>
+            <button className="px-3 py-1 bg-yellow-100 rounded" onClick={() => { setUserActionToPerform('deactivate'); setUserActionConfirmOpen(true); }} disabled={userActionsLoading}>Desactivar</button>
+            <button className="px-3 py-1 bg-blue-100 rounded" onClick={() => { setUserActionToPerform('activate'); setUserActionConfirmOpen(true); }} disabled={userActionsLoading}>Activar</button>
+            <button className="px-3 py-1 bg-white border rounded" onClick={() => setUserActionsOpen(false)} disabled={userActionsLoading}>Cancelar</button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Confirmación por acción de usuario */}
+      <Modal open={userActionConfirmOpen} onClose={() => { if (!userActionsLoading) setUserActionConfirmOpen(false); }}>
+        <div>
+          <h4 className="font-bold mb-2">Confirmar acción</h4>
+          <div className="mb-3 text-sm text-muted-foreground">
+            {(() => {
+              if (!userActionToPerform) return 'Seleccione una acción.';
+              const map: Record<string,string> = { block: 'bloquear', unblock: 'desbloquear', deactivate: 'desactivar', activate: 'activar' };
+              return `¿Está seguro de ${map[userActionToPerform]} al usuario?`;
+            })()}
+          </div>
+          <div className="flex gap-2 justify-end">
+            <button className="px-3 py-1 bg-white border rounded" onClick={() => { if (!userActionsLoading) setUserActionConfirmOpen(false); }} disabled={userActionsLoading}>Cancelar</button>
+            <button className="px-3 py-1 bg-red-100 rounded" onClick={async () => {
+              if (!userActionToPerform) return;
+              await performUserAction(userActionToPerform);
+              setUserActionConfirmOpen(false);
+            }} disabled={userActionsLoading}>{userActionsLoading ? 'Procesando...' : 'Confirmar'}</button>
+          </div>
+        </div>
+      </Modal>
+
       {/* Confirmation modal for reported actions */}
       <Modal open={confirmOpen} onClose={() => { if (!confirmLoading) setConfirmOpen(false); }}>
         <div>
@@ -563,7 +691,7 @@ export default function Dashboard() {
             {confirmType === 'bloquear' && 'Confirma bloquear/desactivar al usuario propietario.'}
           </div>
           {(confirmType === 'ocultar' || confirmType === 'eliminar' || confirmType === 'ignorar') && (
-            <textarea value={confirmMotivo} onChange={(e) => setConfirmMotivo(e.target.value)} className="w-full border rounded p-2 mt-1 mb-3" rows={3} placeholder="Motivo (opcional)" />
+            <textarea value={confirmMotivo} onChange={(e) => setConfirmMotivo(e.target.value)} rows={3} placeholder="Motivo (opcional)" className="w-full border border-gray-200 bg-white rounded-lg p-3 mt-1 mb-3 shadow-sm transition-colors resize-none placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300" />
           )}
           <div className="flex gap-2 justify-end">
             <button className="px-3 py-1 bg-white border rounded" onClick={() => { if (!confirmLoading) setConfirmOpen(false); }} disabled={confirmLoading}>Cancelar</button>
@@ -585,7 +713,7 @@ export default function Dashboard() {
                   setFlashMessage('Reporte ignorado');
                 } else if (confirmType === 'bloquear') {
                   const ownerId = String(confirmPayload.ownerId);
-                  const res = await fetch(`${(import.meta.env.VITE_API_URL as string) || 'http://localhost:8080'}/api/admin/users/${ownerId}/deactivate`, {
+                  const res = await fetch(`${(import.meta.env.VITE_API_URL as string) || 'http://localhost:8080'}/api/admin/users/${ownerId}/block`, {
                     method: 'POST', headers: { 'X-User-Id': String(confirmPayload.userId), 'Content-Type': 'application/json' }
                   });
                   if (!res.ok) throw new Error(await res.text());
