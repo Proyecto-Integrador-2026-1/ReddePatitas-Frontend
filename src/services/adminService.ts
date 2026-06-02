@@ -88,6 +88,20 @@ export async function moderationHistory(userId?: string, page = 0, size = 50) {
   return handleRes(res);
 }
 
+export async function cleanupOldReports() {
+  const res = await fetch(`${BASE}/cleanup/reports`, {
+    method: 'DELETE',
+    headers: { ...authHeaders(false), Accept: 'application/json' },
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `API error ${res.status}`);
+  }
+  const ct = res.headers.get('content-type') || '';
+  if (!ct.includes('application/json')) return null;
+  return res.json().catch(() => null);
+}
+
 export async function getUserMetrics(userId?: string) {
   const res = await fetch(`${BASE}/user-metrics`, {
     method: 'GET',
@@ -186,6 +200,7 @@ export default {
   ignorarReporte,
   restaurarPublicacion,
   moderationHistory,
+  cleanupOldReports,
   getUserMetrics,
   blockUser,
   unblockUser,

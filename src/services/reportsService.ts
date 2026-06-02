@@ -10,15 +10,19 @@ async function handleRes(res: Response) {
     return res.json();
 }
 
-export async function resolveReport(id: string, dto: { reencontrado: boolean; mensaje?: string }, userId: string) {
+import { getValidToken } from "../utils/jwt";
+
+export async function resolveReport(id: string, dto: { reencontrado: boolean; mensaje?: string }) {
     if (!id) throw new Error('missing_report_id');
-    if (!userId) throw new Error('missing_user_id');
+
+    const token = getValidToken();
+    if (!token) throw new Error('missing_token');
 
     const res = await fetch(`${REPORTS_URL}/${id}/resolve`, {
         method: 'PUT',
         headers: {
             'Content-Type': 'application/json',
-            'X-User-Id': String(userId),
+            'Authorization': `Bearer ${token}`,
             Accept: 'application/json',
         },
         body: JSON.stringify(dto),

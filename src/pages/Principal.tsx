@@ -224,7 +224,7 @@ export function Principal() {
     if (!userId) return;
 
     try {
-      const resp = await messagingService.listConversations(String(userId));
+      const resp = await messagingService.listConversations();
       if (isMounted.current) {
         setTotalUnread(resp.totalUnread);
       }
@@ -507,7 +507,7 @@ export function PrincipalModal({
                           receiverId: String(ownerIdFromMascota || ""),
                           content: message,
                         };
-                        await messagingService.sendMessage(dto, userId);
+                        await messagingService.sendMessage(dto);
                         setSentOk(true);
                         setMessage('');
                         setContactOpen(false);
@@ -614,7 +614,7 @@ export function PrincipalModal({
                 onClick={async () => {
                   setResolving(true);
                   try {
-                    await reportsService.resolveReport(String(mascota.id), { reencontrado: Boolean(reencontrado), mensaje: resolveMessage || undefined }, String(userId));
+                    await reportsService.resolveReport(String(mascota.id), { reencontrado: Boolean(reencontrado), mensaje: resolveMessage || undefined });
                     alert('Publicación marcada como resuelta');
                     setResolveOpen(false);
                     onResolved?.();
