@@ -78,7 +78,7 @@ export default function MessagesPage() {
   const refreshConversations = async () => {
     if (!userId) return;
     try {
-      const resp = await messagingService.listConversations(userId);
+      const resp = await messagingService.listConversations();
       const rawConvs = Array.isArray(resp?.conversations) ? resp.conversations : [];
 
       // Cargar reportsIndex para nombres de mascotas
@@ -114,7 +114,7 @@ export default function MessagesPage() {
   const refreshMessages = async (conversationId: string) => {
     if (!userId) return;
     try {
-      const msgs = await messagingService.getConversationMessages(conversationId, userId);
+      const msgs = await messagingService.getConversationMessages(conversationId);
       setMessages(Array.isArray(msgs) ? msgs : []);
       setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
     } catch (err) {
@@ -207,7 +207,7 @@ export default function MessagesPage() {
     const loadMsgs = async () => {
       setLoadingMsgs(true);
       try {
-        const msgs = await messagingService.getConversationMessages(selectedConv.id, userId);
+        const msgs = await messagingService.getConversationMessages(selectedConv.id);
         if (!mounted) return;
         setMessages(Array.isArray(msgs) ? msgs : []);
         setConversations((prev) => prev.map((p: any) => (p.id === selectedConv.id ? { ...p, unreadCount: 0 } : p)));
@@ -219,7 +219,7 @@ export default function MessagesPage() {
       }
       (async () => {
         try {
-          await messagingService.markConversationAsRead(selectedConv.id, userId);
+          await messagingService.markConversationAsRead(selectedConv.id);
         } catch (e) {}
       })();
     };
@@ -248,9 +248,9 @@ export default function MessagesPage() {
         '';
       const reportId = selectedConv?.reportId || selectedConv?.report?.id || '';
       const dto = { reportId, receiverId, content: texto };
-      await messagingService.sendMessage(dto, userId);
+      await messagingService.sendMessage(dto);
       setTexto('');
-      const msgs = await messagingService.getConversationMessages(selectedConv.id, userId);
+      const msgs = await messagingService.getConversationMessages(selectedConv.id);
       setMessages(Array.isArray(msgs) ? msgs : []);
       setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
     } catch (err) {
@@ -348,7 +348,7 @@ export default function MessagesPage() {
                           e.stopPropagation();
                           if (confirm(`¿Eliminar conversación con ${name}? Esta acción no se puede deshacer.`)) {
                             try {
-                              await messagingService.deleteConversation(conv.id, userId);
+                              await messagingService.deleteConversation(conv.id);
                               setConversations(prev => prev.filter(c => c.id !== conv.id));
                               if (selectedConv?.id === conv.id) {
                                 setSelectedConv(null);

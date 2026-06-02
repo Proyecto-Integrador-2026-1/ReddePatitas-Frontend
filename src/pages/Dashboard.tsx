@@ -724,10 +724,7 @@ export default function Dashboard() {
                   setFlashMessage('Reporte ignorado');
                 } else if (confirmType === 'bloquear') {
                   const ownerId = String(confirmPayload.ownerId);
-                  const res = await fetch(`${(import.meta.env.VITE_API_URL as string) || 'http://localhost:8080'}/api/admin/users/${ownerId}/block`, {
-                    method: 'POST', headers: { 'X-User-Id': String(confirmPayload.userId), 'Content-Type': 'application/json' }
-                  });
-                  if (!res.ok) throw new Error(await res.text());
+                  await adminService.blockUser(ownerId, confirmMotivo || '');
                   setFlashMessage('Usuario bloqueado/desactivado');
                 }
                 setConfirmOpen(false);

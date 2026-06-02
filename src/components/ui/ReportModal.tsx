@@ -77,7 +77,7 @@ export default function ReportModal({
         descripcion: descripcionValue,
       };
 
-      const msg = await reportService.submitReportPublication(payload as any, userId, ownerId);
+      const msg = await reportService.submitReportPublication(payload as any, ownerId);
 
       // mark locally to avoid double reports in UI
       try {
