@@ -38,6 +38,8 @@ export default function Dashboard() {
   const [confirmPayload, setConfirmPayload] = useState<any | null>(null);
   const [confirmMotivo, setConfirmMotivo] = useState('');
   const [confirmLoading, setConfirmLoading] = useState(false);
+  const [cleanupConfirmOpen, setCleanupConfirmOpen] = useState(false);
+  const [cleanupLoading, setCleanupLoading] = useState(false);
   const [userActionsOpen, setUserActionsOpen] = useState(false);
   const [userActionsPayload, setUserActionsPayload] = useState<any | null>(null);
   const [userActionsMotivo, setUserActionsMotivo] = useState('');
@@ -434,6 +436,15 @@ export default function Dashboard() {
                     } catch (e) { alert(String(e)); }
                   }}>Ver historial de moderación</Button>
                 </div>
+                <div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setCleanupConfirmOpen(true)}
+                  >
+                    Eliminar reportes antiguos (más de 14 días)
+                  </Button>
+                </div>
               </div>
             </section>
           )}
@@ -729,6 +740,30 @@ export default function Dashboard() {
                 setConfirmPayload(null);
               }
             }} disabled={confirmLoading}>{confirmLoading ? 'Procesando...' : 'Confirmar'}</button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Confirm modal for deleting old reports */}
+      <Modal open={cleanupConfirmOpen} onClose={() => { if (!cleanupLoading) setCleanupConfirmOpen(false); }}>
+        <div>
+          <h4 className="font-bold mb-2">Eliminar reportes antiguos</h4>
+          <div className="mb-3 text-sm text-muted-foreground">¿Confirma eliminar los reportes con más de 14 días? Esta acción no se puede deshacer.</div>
+          <div className="flex gap-2 justify-end">
+            <button className="px-3 py-1 bg-white border rounded" onClick={() => { if (!cleanupLoading) setCleanupConfirmOpen(false); }} disabled={cleanupLoading}>Cancelar</button>
+            <button className="px-3 py-1 bg-red-100 rounded" onClick={async () => {
+              setCleanupLoading(true);
+              try {
+                const res = await adminService.cleanupOldReports();
+                const deleted = res?.deletedCount ?? res?.deleted ?? 0;
+                setFlashMessage(res?.message ?? `Se eliminaron ${deleted} reportes antiguos`);
+                setCleanupConfirmOpen(false);
+              } catch (e) {
+                setFlashMessage(String(e));
+              } finally {
+                setCleanupLoading(false);
+              }
+            }} disabled={cleanupLoading}>{cleanupLoading ? 'Procesando...' : 'Eliminar'}</button>
           </div>
         </div>
       </Modal>
